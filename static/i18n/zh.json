@@ -7,14 +7,12 @@
   "hdr.browse": "浏览…",
   "hdr.upload": "上传",
   "hdr.lang": "语言",
-
   "card.data": "数据",
   "card.view": "显示",
   "card.fit": "拟合设置",
   "collapse.title.data": "展开 / 收起详细信息",
   "collapse.title.view": "展开 / 收起显示设置",
   "common.browse": "浏览",
-
   "data.empty": "尚未加载文件",
   "data.obsVac": "观测谱波长系",
   "data.obsVac.title": "FITS 里的波长轴是 air 还是 vacuum；拟合时会自动与模板波长系对齐",
@@ -51,7 +49,6 @@
   "data.wavestep": "λ 步长 (Å)",
   "data.wavelog": "手动值为 log10(λ)",
   "data.apply": "应用覆盖并重新识别",
-
   "view.refresh": "刷新图像 / 光谱",
   "view.fullband": "全谱",
   "view.imgmode": "图像模式",
@@ -75,7 +72,6 @@
   "view.showmask": "光谱标出 mask 坏点",
   "view.showerr": "1σ 误差带",
   "view.waverest": "光谱横轴用静止系",
-
   "tab.map": "数据立方图",
   "tab.spec": "光谱",
   "tab.result": "拟合结果",
@@ -99,7 +95,6 @@
   "result.export.fits": "下载 FITS",
   "empty.p1": "打开左侧文件后，这里显示数据立方图像 / 光谱。",
   "empty.p2": "支持单光谱 FITS（flux 在 HDU0 或任意扩展）与 3D cube（谱轴可为 numpy 轴 0/1/2，线性或 log10 波长）。",
-
   "fit.targetNone": "目标：未选择",
   "fit.engine": "引擎",
   "fit.engine.sew": "ppxf-sew（连续谱平滑 / EW）",
@@ -163,13 +158,11 @@
   "fit.run": "开始拟合",
   "splitter.title": "拖动调节上/下区域高度（双击恢复自动）",
   "tip.refreshReset": "刷新后当前拟合结果会被清除",
-
   "modal.title": "选择 FITS 文件",
   "modal.close": "关闭",
   "modal.go": "前往",
   "modal.up": "上一级",
   "modal.empty": "此目录没有 FITS 文件",
-
   "status.backend": "后端未就绪: {msg}",
   "status.loading": "加载中…",
   "status.loaded": "已加载 {name} ({kind})",
@@ -182,7 +175,6 @@
   "status.bins.ok": "已分 {n} 个 bin（目标 S/N={sn}{med}）",
   "status.bins.med": "，中位 S/N≈{med}",
   "status.autoz": "测量中…",
-
   "warn.prefix": "注意：",
   "warn.ivar": "HDU[{i}] 无扩展名，按数值特征识别为 IVAR",
   "warn.var": "HDU[{i}] 无扩展名，按数值特征识别为 variance",
@@ -194,7 +186,6 @@
   "msg.fitFail": "拟合失败",
   "msg.binFail": "分 bin 失败: {msg}",
   "msg.noWCS": "该文件无 WCS，无法使用角秒单位",
-
   "tpl.msg.needUrl": "请先填写模板 npz 的下载 URL",
   "tpl.msg.downloading": "下载中…",
   "tpl.msg.dling": "正在下载（大文件可能较慢）…",
@@ -209,7 +200,6 @@
   "tpl.status.count": "{n} 个模板可用：{names}",
   "tpl.status.none": "没有可用模板，请下载或上传 npz",
   "tpl.status.fail": "模板列表加载失败: {msg}",
-
   "meta.cube3d": "数据立方 (3D)",
   "meta.spec12d": "单光谱 (1D/2D)",
   "meta.unknown": "未识别",
@@ -227,7 +217,6 @@
   "meta.auto": "自动",
   "meta.npAxis": "numpy 轴 {i} (当前长度 {n})",
   "meta.unused": "未使用",
-
   "dlam.src.custom": "自定义",
   "dlam.src.obs": "观测谱采样",
   "dlam.src.tpl": "模板采样",
@@ -238,7 +227,6 @@
   "dlam.hint.custom": "⟹ 自定义格距 dlam={dlam} dex/px，velscale ≈ {v} km/s",
   "dlam.hint.obs": "⟹ 观测谱采样 dlam={dlam} dex/px，velscale ≈ {v} km/s",
   "dlam.hint.default": "⟹ 模板采样信息不可用，将用默认 1e-4 dex（≈69 km/s）",
-
   "dust.hint.none": "⟹ 不对恒星模板做消光改正",
   "dust.hint.calzetti": "⟹ Calzetti et al. (2000)，拟合 A_V",
   "dust.hint.powerlaw": "⟹ A_λ = A_V (λ/5500)^β，拟合 A_V 与 β",
@@ -247,10 +235,8 @@
   "dust.hint.gas": "，气体线单独一套 A_V",
   "dust.hint.stars": "，仅恒星连续谱",
   "dust.hint.av": "；A_V 范围 {av}",
-
   "ap.hint.pix": "= {px} px（像素尺度 {sc}″/px）",
   "ap.hint.arcsec": "= {as}″（像素尺度 {sc}″/px）",
-
   "target.none": "目标：未选择",
   "target.bin": "目标：bin <b>#{bin}</b>（{npix} px）",
   "target.pixel": "目标：像素 <b>({x}, {y})</b>",
@@ -267,7 +253,6 @@
   "spec.title.bin": "光谱 · bin #{bin}（{npix} px）",
   "spec.title.pix": "光谱 · 像素 ({x}, {y})",
   "spec.title.row": "光谱 · 第 {row} 行",
-
   "fit.msg.updateSpec": "更新光谱…",
   "fit.msg.submit": "提交任务…",
   "fit.msg.failed": "失败",
@@ -280,7 +265,6 @@
   "fit.prog.ppxf": "pPXF 拟合（{engine}）",
   "fit.prog.results": "整理结果",
   "fit.prog.done": "完成",
-
   "r.target": "目标",
   "r.template": "模板",
   "r.engine": "引擎",
@@ -304,13 +288,11 @@
   "r.age": "年龄",
   "r.metal": "⟨[M/H]⟩",
   "r.gasNone": "未使用发射线模板",
-
   "dust.short.none": "无消光",
   "dust.short.calzetti": "Calzetti (C+00)",
   "dust.short.powerlaw": "幂律 (A_V, β)",
   "dust.short.kc13": "KC13 (A_V, δ)",
   "dust.short.custom": "自定义",
-
   "log.noerr": "未提供误差 HDU，自动改用残差噪声估计",
   "log.wavesys": "观测谱 λ: air → vacuum（拟合在 vacuum 网格）",
   "log.zauto": "自动红移 z = {z} ({method}, SNR={snr})",
@@ -334,7 +316,6 @@
   "log.plotfail": "p.plot() 渲染失败: {err}",
   "log.wplotfail": "template.plot() 渲染失败: {err}",
   "log.dustfit": "尘埃消光拟合: {parts}",
-
   "ws.title": "工作区",
   "ws.hint": "模板与拟合结果保存在本浏览器（IndexedDB），不上传服务器。",
   "ws.templates": "模板",
@@ -359,17 +340,23 @@
   "ws.cacheDone": "已缓存 {n} 个依赖文件到工作区",
   "ws.dirAt": "工作区：{name}",
   "ws.dirNone": "工作区：仅浏览器存储",
-
   "wiz.title": "设置工作区",
   "wiz.desc": "选一个本地文件夹存放模板、FITS 和拟合结果；运行依赖会缓存到工作区，下次打开不用重新下载。",
   "wiz.li1": "templates/ —— 星族模板（npz）",
   "wiz.li2": "results/ —— 拟合结果（json + png）",
   "wiz.li3": "data/ —— 导入的 FITS；cache/ —— 运行依赖副本",
   "wiz.pick": "选择工作目录…",
+  "wiz.opfs": "浏览器私有目录",
   "wiz.skip": "仅用浏览器存储",
   "wiz.go": "开始使用",
   "wiz.mirror": "把运行依赖保存到工作区（下次不用重新下载）",
   "wiz.chosen": "已选择：{name}",
   "wiz.browserOnly": "将只用浏览器存储（IndexedDB），清缓存后会丢失。",
-  "wiz.unsupported": "当前浏览器不支持目录访问，将只用浏览器存储。"
+  "wiz.unsupported": "当前浏览器不支持目录访问，将只用浏览器存储。",
+  "wiz.server": "服务器工作区",
+  "wiz.serverChosen": "已选择服务器工作区：{root}",
+  "wiz.tokenAsk": "服务器工作区口令",
+  "wiz.tokenBad": "口令无效",
+  "ws.srvAt": "工作区（服务器）：{root}",
+  "ws.hint.srv": "模板与拟合结果直接保存到服务器工作区：{root}"
 }

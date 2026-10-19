@@ -7,14 +7,12 @@
   "hdr.browse": "Browse…",
   "hdr.upload": "Upload",
   "hdr.lang": "Language",
-
   "card.data": "Data",
   "card.view": "Display",
   "card.fit": "Fit settings",
   "collapse.title.data": "Expand / collapse details",
   "collapse.title.view": "Expand / collapse display settings",
   "common.browse": "Browse",
-
   "data.empty": "No file loaded",
   "data.obsVac": "Observed frame",
   "data.obsVac.title": "Whether the FITS wavelength axis is air or vacuum; aligned with the template frame automatically when fitting",
@@ -51,7 +49,6 @@
   "data.wavestep": "λ step (Å)",
   "data.wavelog": "Manual values are log10(λ)",
   "data.apply": "Apply override and re-detect",
-
   "view.refresh": "Refresh image / spectrum",
   "view.fullband": "Full range",
   "view.imgmode": "Image mode",
@@ -75,7 +72,6 @@
   "view.showmask": "Mark masked pixels",
   "view.showerr": "1σ error band",
   "view.waverest": "Rest-frame wavelength axis",
-
   "tab.map": "Cube image",
   "tab.spec": "Spectrum",
   "tab.result": "Fit result",
@@ -99,7 +95,6 @@
   "result.export.fits": "Download FITS",
   "empty.p1": "Open a file on the left to show the cube image / spectrum here.",
   "empty.p2": "Supports single-spectrum FITS (flux in HDU0 or any extension) and 3D cubes (spectral axis may be numpy axis 0/1/2, linear or log10).",
-
   "fit.targetNone": "Target: none",
   "fit.engine": "Engine",
   "fit.engine.sew": "ppxf-sew (continuum smoothing / EW)",
@@ -163,13 +158,11 @@
   "fit.run": "Start fit",
   "splitter.title": "Drag to resize the top/bottom areas (double-click to reset)",
   "tip.refreshReset": "Refreshing clears the current fit result",
-
   "modal.title": "Select a FITS file",
   "modal.close": "Close",
   "modal.go": "Go",
   "modal.up": "Up",
   "modal.empty": "No FITS files in this directory",
-
   "status.backend": "Backend not ready: {msg}",
   "status.loading": "Loading…",
   "status.loaded": "Loaded {name} ({kind})",
@@ -182,7 +175,6 @@
   "status.bins.ok": "{n} bins created (target S/N={sn}{med})",
   "status.bins.med": ", median S/N≈{med}",
   "status.autoz": "Measuring…",
-
   "warn.prefix": "Warning: ",
   "warn.ivar": "HDU[{i}] has no extension name; identified as IVAR from data values",
   "warn.var": "HDU[{i}] has no extension name; identified as variance from data values",
@@ -194,7 +186,6 @@
   "msg.fitFail": "Fit failed",
   "msg.binFail": "Binning failed: {msg}",
   "msg.noWCS": "This file has no WCS; arcsec units are unavailable",
-
   "tpl.msg.needUrl": "Enter the template npz URL first",
   "tpl.msg.downloading": "Downloading…",
   "tpl.msg.dling": "Downloading (large files may take a while)…",
@@ -209,7 +200,6 @@
   "tpl.status.count": "{n} templates available: {names}",
   "tpl.status.none": "No templates available; download or upload an npz",
   "tpl.status.fail": "Failed to load template list: {msg}",
-
   "meta.cube3d": "Data cube (3D)",
   "meta.spec12d": "Spectrum (1D/2D)",
   "meta.unknown": "not detected",
@@ -227,7 +217,6 @@
   "meta.auto": "auto",
   "meta.npAxis": "numpy axis {i} (length {n})",
   "meta.unused": "unused",
-
   "dlam.src.custom": "custom",
   "dlam.src.obs": "observed sampling",
   "dlam.src.tpl": "template sampling",
@@ -238,7 +227,6 @@
   "dlam.hint.custom": "⟹ custom dlam={dlam} dex/px, velscale ≈ {v} km/s",
   "dlam.hint.obs": "⟹ observed dlam={dlam} dex/px, velscale ≈ {v} km/s",
   "dlam.hint.default": "⟹ template sampling unavailable; using default 1e-4 dex (≈69 km/s)",
-
   "dust.hint.none": "⟹ no extinction correction applied to stellar templates",
   "dust.hint.calzetti": "⟹ Calzetti et al. (2000), fitting A_V",
   "dust.hint.powerlaw": "⟹ A_λ = A_V (λ/5500)^β, fitting A_V and β",
@@ -247,10 +235,8 @@
   "dust.hint.gas": ", separate A_V for gas lines",
   "dust.hint.stars": ", stellar continuum only",
   "dust.hint.av": "; A_V range {av}",
-
   "ap.hint.pix": "= {px} px (pixel scale {sc}″/px)",
   "ap.hint.arcsec": "= {as}″ (pixel scale {sc}″/px)",
-
   "target.none": "Target: none",
   "target.bin": "Target: bin <b>#{bin}</b> ({npix} px)",
   "target.pixel": "Target: pixel <b>({x}, {y})</b>",
@@ -267,7 +253,6 @@
   "spec.title.bin": "Spectrum · bin #{bin} ({npix} px)",
   "spec.title.pix": "Spectrum · pixel ({x}, {y})",
   "spec.title.row": "Spectrum · row {row}",
-
   "fit.msg.updateSpec": "Updating spectrum…",
   "fit.msg.submit": "Submitting job…",
   "fit.msg.failed": "Failed",
@@ -280,7 +265,6 @@
   "fit.prog.ppxf": "pPXF fit ({engine})",
   "fit.prog.results": "Collecting results",
   "fit.prog.done": "done",
-
   "r.target": "Target",
   "r.template": "Template",
   "r.engine": "Engine",
@@ -304,13 +288,11 @@
   "r.age": "Age",
   "r.metal": "⟨[M/H]⟩",
   "r.gasNone": "Emission-line templates not used",
-
   "dust.short.none": "no extinction",
   "dust.short.calzetti": "Calzetti (C+00)",
   "dust.short.powerlaw": "power law (A_V, β)",
   "dust.short.kc13": "KC13 (A_V, δ)",
   "dust.short.custom": "custom",
-
   "log.noerr": "No error HDU provided; using residual noise estimate",
   "log.wavesys": "Observed λ: air → vacuum (fitting on a vacuum grid)",
   "log.zauto": "Auto redshift z = {z} ({method}, SNR={snr})",
@@ -334,7 +316,6 @@
   "log.plotfail": "p.plot() rendering failed: {err}",
   "log.wplotfail": "template.plot() rendering failed: {err}",
   "log.dustfit": "Dust fit: {parts}",
-
   "ws.title": "Workspace",
   "ws.hint": "Templates and fit results are stored in this browser (IndexedDB); nothing is uploaded.",
   "ws.templates": "Templates",
@@ -359,17 +340,23 @@
   "ws.cacheDone": "Cached {n} runtime files into the workspace",
   "ws.dirAt": "Workspace: {name}",
   "ws.dirNone": "Workspace: browser storage only",
-
   "wiz.title": "Set up a workspace",
   "wiz.desc": "Pick a local folder to store templates, FITS files and fit results; the runtime is cached there so you don't download it again.",
   "wiz.li1": "templates/ — stellar templates (npz)",
   "wiz.li2": "results/ — fit results (json + png)",
   "wiz.li3": "data/ — imported FITS; cache/ — runtime copy",
   "wiz.pick": "Choose folder…",
+  "wiz.opfs": "Private browser folder",
   "wiz.skip": "Browser storage only",
   "wiz.go": "Get started",
   "wiz.mirror": "Save the runtime into the workspace (no re-download next time)",
   "wiz.chosen": "Selected: {name}",
   "wiz.browserOnly": "Using browser storage only; clearing site data removes everything.",
-  "wiz.unsupported": "This browser cannot access folders; using browser storage only."
+  "wiz.unsupported": "This browser cannot access folders; using browser storage only.",
+  "wiz.server": "Server workspace",
+  "wiz.serverChosen": "Server workspace: {root}",
+  "wiz.tokenAsk": "Server workspace token",
+  "wiz.tokenBad": "Invalid token",
+  "ws.srvAt": "Workspace (server): {root}",
+  "ws.hint.srv": "Templates and fit results are stored on the server workspace: {root}"
 }

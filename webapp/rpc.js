@@ -193,7 +193,7 @@
     await fsWrite(path, bytes);
     // 镜像到工作区目录（若有）
     const wsfs = window.SEWWS;
-    if (wsfs && wsfs.dir) {
+    if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
       const sub = kind === KIND_TPL ? 'templates' : 'data';
       try { await wsfs.writeFile(sub, clean, new Blob([bytes])); }
       catch (e) { console.warn('写入工作区失败', e); }
@@ -205,7 +205,7 @@
     await WS.del('files', rec.path);
     try { await fsDelete(rec.path); } catch (e) { /* ignore */ }
     const wsfs = window.SEWWS;
-    if (wsfs && wsfs.dir) {
+    if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
       const sub = rec.kind === KIND_TPL ? 'templates' : 'data';
       try { await wsfs.deleteFile(sub, rec.name); } catch (e) { /* ignore */ }
     }
@@ -218,7 +218,7 @@
     }
     // 从工作区目录导入尚未登记的文件（换浏览器 / 手放进去的）
     const wsfs = window.SEWWS;
-    if (wsfs && wsfs.dir) {
+    if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
       const known = new Set(items.map((x) => x.name));
       for (const [sub, kind] of [['templates', KIND_TPL], ['data', KIND_FITS]]) {
         let names = [];
@@ -259,7 +259,7 @@
       await WS.put('results', rec);
       // 镜像到工作区 results/：<时间>_<模板>.json / .png
       const wsfs = window.SEWWS;
-      if (wsfs && wsfs.dir) {
+      if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
         const d = new Date(rec.created);
         const p2 = (n) => String(n).padStart(2, '0');
         const stem = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-`
@@ -594,6 +594,13 @@
   }
 
   window.sewOnResult = saveResult;
+  // 刚绑定/切换工作区目录后重新扫描（导入目录里已有的模板与 FITS）
+  window.sewRescanWorkspace = async () => {
+    wsSynced = null;
+    await ensureWs();
+    await renderWorkspace();
+    if (window.loadTemplates) await window.loadTemplates();
+  };
 
   document.addEventListener('DOMContentLoaded', () => {
     // 浏览器端没有「服务器路径」概念，改提示

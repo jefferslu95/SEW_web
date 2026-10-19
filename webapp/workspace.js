@@ -24,10 +24,74 @@
 
   const SEWWS = {
     supported: FS_SUPPORTED,
-    dir: null,           // FileSystemDirectoryHandle
+    dir: null,           // FileSystemDirectoryHandle（本地目录 / OPFS）
     dirName: '',
+    server: null,        // {root, writable, ...} 服务器工作区
+    backend: 'browser',  // 'server' | 'local' | 'browser'
+    _token: '',
     ready: null,         // Promise
     autoSaveVendor: true,
+
+    _hdr(extra) {
+      return Object.assign({ 'X-SEW-Token': this._token || '' }, extra || {});
+    },
+
+    /* ---------------- 服务器工作区 ---------------- */
+    async detectServer() {
+      try {
+        let r = await fetch('api/ws/info', { cache: 'no-store', headers: this._hdr() });
+        if (r.status === 401) {
+          const tok = localStorage.getItem('sew.ws.token') || '';
+          if (tok) {
+            this._token = tok;
+            r = await fetch('api/ws/info', { cache: 'no-store', headers: this._hdr() });
+          }
+          if (r.status === 401) { this._needsToken = true; return null; }
+        }
+        if (!r.ok) return null;
+        const j = await r.json();
+        if (!j.ok) return null;
+        this.server = j;
+        return j;
+      } catch (e) { return null; }
+    },
+
+    useServer(info) {
+      this.server = info || this.server;
+      if (!this.server) throw new Error('没有可用的服务器工作区');
+      this.backend = 'server';
+      this.dir = null;
+      this.dirName = this.server.root;
+      return this.server;
+    },
+
+    async _srvPut(dir, name, blob) {
+      const q = new URLSearchParams({ dir, name });
+      const r = await fetch('api/ws/put?' + q, {
+        method: 'POST', headers: this._hdr({ 'Content-Type': 'application/octet-stream' }),
+        body: blob,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+      return true;
+    },
+    async _srvList(dir) {
+      const r = await fetch('api/ws/list?' + new URLSearchParams({ dir }),
+        { cache: 'no-store', headers: this._hdr() });
+      const j = await r.json();
+      return (j.files || []).map((f) => f.name);
+    },
+    async _srvGet(dir, name) {
+      const r = await fetch('api/ws/get?' + new URLSearchParams({ dir, name }),
+        { headers: this._hdr() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.blob();
+    },
+    async _srvDel(dir, name) {
+      const r = await fetch('api/ws/delete?' + new URLSearchParams({ dir, name }),
+        { method: 'DELETE', headers: this._hdr() });
+      return r.ok;
+    },
 
     /* ---------------- IndexedDB 小工具 ---------------- */
     async _db() {
@@ -75,6 +139,22 @@
       return handle;
     },
 
+    /* OPFS：与目录句柄同一套接口。用于自动测试，或在系统文件选择被拦截时兜底 */
+    async useOPFS() {
+      if (!navigator.storage || !navigator.storage.getDirectory) {
+        throw new Error('浏览器不支持 OPFS');
+      }
+      const handle = await navigator.storage.getDirectory();
+      this.dir = handle;
+      this.dirName = 'OPFS（浏览器私有）';
+      this.isOPFS = true;
+      for (const sub of SUBDIRS) {
+        await handle.getDirectoryHandle(sub, { create: true });
+      }
+      await this.writeManifest();
+      return handle;
+    },
+
     async _perm(handle, request) {
       if (!handle) return false;
       const q = await handle.queryPermission({ mode: 'readwrite' });
@@ -102,8 +182,9 @@
 
     /* ---------------- 文件读写 ---------------- */
     async writeFile(sub, name, blob) {
+      if (this.backend === 'server') return this._srvPut(sub, name, blob);
       if (!this.dir) return false;
-      const d = await this._dir(sub);
+      const d = (sub === '.' || !sub) ? this.dir : await this._dir(sub);
       const fh = await d.getFileHandle(name, { create: true });
       const w = await fh.createWritable();
       await w.write(blob);
@@ -112,6 +193,7 @@
     },
 
     async deleteFile(sub, name) {
+      if (this.backend === 'server') return this._srvDel(sub, name);
       if (!this.dir) return false;
       try {
         const d = await this._dir(sub);
@@ -121,6 +203,7 @@
     },
 
     async listDir(sub) {
+      if (this.backend === 'server') return this._srvList(sub);
       if (!this.dir) return [];
       const out = [];
       try {
@@ -133,6 +216,7 @@
     },
 
     async readDirFile(sub, name) {
+      if (this.backend === 'server') return this._srvGet(sub, name);
       const d = await this._dir(sub);
       const fh = await d.getFileHandle(name);
       return fh.getFile();
@@ -192,7 +276,7 @@
 
     /* 缓存被人清掉时，从工作区目录恢复 */
     async restoreVendorFromDir() {
-      if (!this.dir) return 0;
+      if (this.backend === 'server' || !this.dir) return 0;
       let root;
       try {
         root = await this.dir.getDirectoryHandle('cache', { create: false });
@@ -241,14 +325,21 @@
         ]);
       } catch (e) { console.warn('SW 注册失败', e); }
     }
-    // 恢复上次的工作区目录（未授权则等用户点按钮）
+    // 1) 服务器工作区（远程部署/SSH 转发时优先）
+    const srv = await SEWWS.detectServer();
+    if (srv && srv.writable) {
+      SEWWS.useServer(srv);
+      return { restored: true, server: true };
+    }
+    // 2) 上次选过的本地目录（未授权则等用户点按钮）
     let restored = false;
     try { restored = await SEWWS.restoreDir(true); } catch (e) { /* ignore */ }
     if (restored) {
+      SEWWS.backend = SEWWS.isOPFS ? 'browser' : 'local';
       const n = await SEWWS.restoreVendorFromDir().catch(() => 0);
       if (n) console.log(`从工作区恢复了 ${n} 个依赖文件到缓存`);
     }
-    return restored;
+    return { restored, server: false };
   }
 
   /* ================= 首次引导 ================= */
@@ -268,6 +359,8 @@
         </ul>
         <div class="wiz-pick">
           <button id="wizPick" class="primary" data-i18n="wiz.pick"></button>
+          <button id="wizServer" class="ghost" data-i18n="wiz.server" style="display:none"></button>
+          <button id="wizOpfs" class="ghost" data-i18n="wiz.opfs"></button>
           <button id="wizSkip" class="ghost" data-i18n="wiz.skip"></button>
         </div>
         <div id="wizInfo" class="small muted"></div>
@@ -298,6 +391,38 @@
         SEWWS.dir = null;
         info().textContent = T('wiz.browserOnly');
       };
+      if ($('wizOpfs')) {
+        $('wizOpfs').onclick = async () => {
+          try {
+            const h = await SEWWS.useOPFS();
+            SEWWS.backend = 'browser';
+            info().textContent = T('wiz.chosen', { name: h.name || 'OPFS' });
+          } catch (e) {
+            info().textContent = String(e.message || e);
+          }
+        };
+      }
+      if ($('wizServer')) {
+        const btnS = $('wizServer');
+        btnS.style.display = (SEWWS.server || SEWWS._needsToken) ? '' : 'none';
+        btnS.onclick = async () => {
+          try {
+            let srv = SEWWS.server;
+            if (!srv) {
+              const tok = window.prompt(T('wiz.tokenAsk'), '');
+              if (!tok) return;
+              SEWWS._token = tok;
+              try { localStorage.setItem('sew.ws.token', tok); } catch (e) { /* ignore */ }
+              srv = await SEWWS.detectServer();
+              if (!srv) throw new Error(T('wiz.tokenBad'));
+            }
+            SEWWS.useServer(srv);
+            info().textContent = T('wiz.serverChosen', { root: srv.root });
+          } catch (e) {
+            info().textContent = String(e.message || e);
+          }
+        };
+      }
       $('wizGo').onclick = async () => {
         const mirror = $('wizMirror').checked;
         w.remove();
@@ -319,11 +444,25 @@
     const status = $('wsDirStatus');
     const refreshStatus = () => {
       if (!status) return;
-      status.textContent = SEWWS.dir
-        ? T('ws.dirAt', { name: SEWWS.dirName })
-        : T('ws.dirNone');
+      if (SEWWS.backend === 'server') {
+        status.textContent = T('ws.srvAt', { root: SEWWS.dirName });
+      } else {
+        status.textContent = SEWWS.dir
+          ? T('ws.dirAt', { name: SEWWS.dirName })
+          : T('ws.dirNone');
+      }
     };
     refreshStatus();
+    const hint = $('wsHint');
+    if (hint) {
+      hint.textContent = SEWWS.backend === 'server'
+        ? T('ws.hint.srv', { root: SEWWS.dirName })
+        : T('ws.hint');
+    }
+    // 服务器工作区不需要把依赖镜像到目录（浏览器缓存已经够用）
+    if (btn && SEWWS.backend === 'server') {
+      btn.style.display = 'none';
+    }
 
     if (btn) {
       btn.onclick = async () => {
@@ -350,19 +489,30 @@
     }
   }
 
-  SEWWS.ready = preInit().then(async (restored) => {
-    // 第一次进入（没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
+  const preInitP = preInit();
+  window.__sewPreInit = preInitP;   // 只包含 SW 注册 + 工作区探测（不等内核）
+
+  SEWWS.ready = preInitP.then(async (st) => {
+    const restored = !!(st && st.restored);
+    const serverMode = !!(st && st.server);
+    // 第一次进入（没有服务器工作区、没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
     let wantMirror = false;
     let skipped = false;
     try { skipped = !!(await SEWWS._metaGet('skipWizard')); } catch (e) { /* ignore */ }
     if (!restored && !skipped) {
       const r = await wizardFirstRun();
-      wantMirror = r.mirror && !!SEWWS.dir;
+      wantMirror = r.mirror && (SEWWS.backend === 'local');
     } else if (restored) {
-      wantMirror = true;
+      wantMirror = SEWWS.backend === 'local';
+    }
+    if (SEWWS.dir || SEWWS.backend === 'server') {
+      // 刚选定工作区：把面板状态与已有文件同步过来
+      try {
+        if (window.sewRescanWorkspace) await window.sewRescanWorkspace();
+        if (typeof afterBoot === 'function') await afterBoot();
+      } catch (e) { console.warn(e); }
     }
     if (wantMirror && SEWWS.dir) {
-      // 首次/恢复后都确保依赖已缓存并镜像（不阻塞启动）
       setTimeout(async () => {
         try {
           await SEWWS.primeVendorCache();
@@ -370,11 +520,10 @@
         } catch (e) { console.warn(e); }
       }, 3000);
     }
-    return SEWWS.dir;
+    return SEWWS.dir || SEWWS.server;
   });
 
   window.SEWWS = SEWWS;
-  window.__sewPreInit = SEWWS.ready;
   document.addEventListener('DOMContentLoaded', () => {
     SEWWS.ready.then(afterBoot).catch((e) => console.warn(e));
   });
