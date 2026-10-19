@@ -1,0 +1,17 @@
+# SEW_web 运行依赖（与本地已验证环境一致：python 3.11 / ppxf 9.5.0 / ppxf-sew 0.8.2）
+flask>=2.1,<4
+numpy>=1.26.4,<2
+scipy>=1.12.0
+matplotlib>=3.6
+astropy>=5.0
+
+# plotly 的 python 包只用来提供前端 plotly.min.js（backend/app.py 的 /vendor 路由）；
+# 6.x 起不再随包附带该文件，因此限制在 5.x。
+plotly>=5.0,<6
+
+# 拟合引擎：ppxf-sew 0.8.2 硬性依赖 ppxf==9.5.0
+ppxf==9.5.0
+ppxf-sew==0.8.2
+
+# PowerBin 分 bin（依赖 plotbin / numpy / scipy / matplotlib）
+powerbin>=1.1,<2

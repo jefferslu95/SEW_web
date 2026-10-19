@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python syntax check
+        run: python -m compileall -q backend run.py
+      - name: i18n keys consistent (zh vs en)
+        run: python scripts/check_i18n.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: JS syntax check
+        run: |
+          node --check static/app.js
+          node --check static/i18n.js
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t sew-web:ci .
+      - name: Smoke test /api/health
+        run: |
+          docker run -d --name sew-ci -p 8765:8765 sew-web:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/api/health; then break; fi
+            sleep 5
+          done
+          curl -fsS http://127.0.0.1:8765/api/health
+          docker rm -f sew-ci

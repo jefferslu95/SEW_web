@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SEW web</title>
+<link rel="stylesheet" href="/static/style.css"/>
+<script src="/vendor/plotly.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="logo">SEW<span>web</span></span>
+    <span class="sub">FITS spectrum / cube viewer &amp; fitter</span>
+  </div>
+  <div class="openwrap">
+    <div class="openbar">
+      <input id="pathInput" type="text" spellcheck="false"
+             data-i18n-ph="hdr.path.ph"/>
+      <button id="openBtn" class="primary" data-i18n="hdr.open"></button>
+      <button id="browseBtn" data-i18n="hdr.browse"></button>
+      <label class="upload-btn"><span data-i18n="hdr.upload"></span>
+        <input id="fileInput" type="file" accept=".fits,.fit,.fts,.fits.gz"/>
+      </label>
+    </div>
+    <span id="topStatus" class="status"></span>
+  </div>
+  <label class="langsel">
+    <span data-i18n="hdr.lang"></span>
+    <select id="langSel">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+    </select>
+  </label>
+</header>
+
+<main>
+  <!-- ======================= 左栏：数据 + 显示 ======================= -->
+  <aside id="leftPanel">
+    <section class="card" id="datasetCard">
+      <h3><span data-i18n="card.data"></span> <button class="collapse-btn" data-target="dataBody"
+                    data-i18n-title="collapse.title.data">▾</button></h3>
+      <div id="dataBody">
+      <div id="fileInfo" class="muted" data-i18n="data.empty"></div>
+      <div id="detectBox" class="kv" style="display:none"></div>
+      <div id="warnBox" class="warn" style="display:none"></div>
+
+      <div class="formgrid" style="margin-top:8px">
+        <label data-i18n="data.obsVac" data-i18n-title="data.obsVac.title"></label>
+        <select id="obsVacSel">
+          <option value="air" data-i18n="data.air"></option>
+          <option value="vacuum" data-i18n="data.vacuum"></option>
+        </select>
+      </div>
+
+      <details id="overrideDetails">
+        <summary data-i18n="data.override"></summary>
+        <div class="formgrid">
+          <label data-i18n="data.kind"></label>
+          <select id="ovKind">
+            <option value="" data-i18n="data.kind.auto"></option>
+            <option value="cube" data-i18n="data.kind.cube"></option>
+            <option value="spectrum" data-i18n="data.kind.spec"></option>
+          </select>
+          <label data-i18n="data.fluxhdu"></label><select id="ovFlux"></select>
+          <label data-i18n="data.fluxcol"></label><select id="ovFluxCol"></select>
+          <label data-i18n="data.varhdu"></label><select id="ovVar"></select>
+          <label data-i18n="data.varcol"></label><select id="ovVarCol"></select>
+          <label data-i18n="data.maskhdu"></label><select id="ovMask"></select>
+          <label data-i18n="data.maskcol"></label><select id="ovMaskCol"></select>
+          <label data-i18n="data.varkind"></label>
+          <select id="ovVarKind">
+            <option value="" data-i18n="data.kind.auto"></option>
+            <option value="var" data-i18n="data.varkind.var"></option>
+            <option value="sigma" data-i18n="data.varkind.sigma"></option>
+            <option value="ivar" data-i18n="data.varkind.ivar"></option>
+          </select>
+          <label data-i18n="data.masksem"></label>
+          <select id="ovMaskSem">
+            <option value="" data-i18n="data.masksem.auto"></option>
+            <option value="bad_nonzero" data-i18n="data.masksem.bad"></option>
+            <option value="good_nonzero" data-i18n="data.masksem.good"></option>
+          </select>
+          <label data-i18n="data.axis"></label><select id="ovAxis"></select>
+          <label data-i18n="data.row"></label><input id="ovRow" type="number" min="0" value="0"/>
+          <label data-i18n="data.wavemode"></label>
+          <select id="ovWaveMode">
+            <option value="" data-i18n="data.kind.auto"></option>
+            <option value="hdu" data-i18n="data.wavemode.hdu"></option>
+            <option value="wcs" data-i18n="data.wavemode.wcs"></option>
+            <option value="custom" data-i18n="data.wavemode.custom"></option>
+          </select>
+          <label data-i18n="data.wavehdu"></label><select id="ovWaveHdu"></select>
+          <label data-i18n="data.wavecol"></label><select id="ovWaveCol"></select>
+          <label data-i18n="data.wavestart"></label><input id="ovWaveStart" type="number" step="any"/>
+          <label data-i18n="data.wavestep"></label><input id="ovWaveStep" type="number" step="any"/>
+        </div>
+        <div class="row"><label class="chk"><input id="ovWaveLog" type="checkbox"/> <span data-i18n="data.wavelog"></span></label></div>
+        <button id="applyOverride" class="ghost" data-i18n="data.apply"></button>
+      </details>
+      </div>
+    </section>
+
+    <section class="card" id="viewCard">
+      <h3><span data-i18n="card.view"></span> <button class="collapse-btn" data-target="displayBody"
+                    data-i18n-title="collapse.title.view">▾</button></h3>
+      <div id="displayBody">
+      <div class="row topbar">
+        <button id="applyView" class="ghost" data-i18n="view.refresh"></button>
+        <button id="fullBand" class="ghost" data-i18n="view.fullband"></button>
+      </div>
+      <div class="formgrid">
+        <label data-i18n="view.imgmode"></label>
+        <select id="imgMode">
+          <option value="white" data-i18n="view.imgmode.white"></option>
+          <option value="snr">S/N</option>
+        </select>
+        <label data-i18n="view.stretch"></label>
+        <select id="stretchSel">
+          <option value="sqrt">sqrt</option>
+          <option value="linear">linear</option>
+          <option value="log" selected>log</option>
+        </select>
+        <label data-i18n="view.band"></label>
+        <div class="dual">
+          <input id="bandMin" type="number" step="any"/>
+          <span>–</span>
+          <input id="bandMax" type="number" step="any"/>
+        </div>
+        <div class="span2 rngpair">
+          <div class="rngtrack"></div><div class="rngfill"></div>
+          <input type="range" id="bandMinR"/>
+          <input type="range" id="bandMaxR"/>
+        </div>
+        <div id="coaddBox" style="display:contents">
+        <label data-i18n="view.coadd"></label>
+        <label class="chk" data-i18n-title="view.coadd.bin.title">
+          <input id="useBin" type="checkbox" checked/> <span data-i18n="view.coadd.bin"></span></label>
+        <label id="binSNLabel" data-i18n="view.binsn"></label>
+        <input id="binSN" type="number" min="1" step="1" value="10"
+               data-i18n-title="view.binsn.title"/>
+        <label id="binSelLabel" data-i18n="view.binsel"></label>
+        <div id="binSelRow" class="dual">
+          <select id="binSel"></select>
+          <button id="binPrev" class="ghost small" data-i18n-title="view.bin.prev">◀</button>
+          <button id="binNext" class="ghost small" data-i18n-title="view.bin.next">▶</button>
+        </div>
+        <label id="apLabel" data-i18n="view.ap"></label>
+        <div id="apRow" class="dual">
+          <input id="aperture" type="number" step="any" min="0" value="0"/>
+          <select id="apUnit" data-i18n-title="view.ap.unit.title">
+            <option value="pix">pix</option>
+            <option value="arcsec" data-i18n="view.ap.arcsec"></option>
+          </select>
+        </div>
+        <div id="apSliderRow" class="span2">
+          <input class="rngsingle" type="range" id="apertureR"/>
+        </div>
+        <div id="apHint" class="span2 small muted"></div>
+        <div id="showBinsRow" class="span2">
+          <label class="chk"><input id="showBins" type="checkbox" checked/>
+            <span data-i18n="view.showbins"></span></label>
+        </div>
+        </div>
+        <label data-i18n="view.crange"></label>
+        <div class="dual">
+          <input id="cminIn" type="number" step="any" placeholder="auto"/>
+          <span>–</span>
+          <input id="cmaxIn" type="number" step="any" placeholder="auto"/>
+        </div>
+      </div>
+      <div class="row small muted">
+        <span data-i18n="view.hint"></span>
+      </div>
+      <div class="row">
+        <label class="chk"><input id="showMask" type="checkbox" checked/>
+          <span data-i18n="view.showmask"></span></label>
+        <label class="chk"><input id="showErr" type="checkbox"/>
+          <span data-i18n="view.showerr"></span></label>
+        <label class="chk"><input id="waveRestChk" type="checkbox"/>
+          <span data-i18n="view.waverest"></span></label>
+      </div>
+      <div id="colorbar" class="colorbar hidden">
+        <div class="cbar-grad"></div>
+        <div class="cbar-labels"><span id="cbarMin">-</span><span id="cbarMax">-</span></div>
+      </div>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- ======================= 中栏：展示区 ======================= -->
+  <section id="centerPanel">
+    <div class="card display-card">
+      <div class="tabs" id="displayTabs">
+        <button data-view="map" class="active" data-i18n="tab.map"></button>
+        <button data-view="spec" data-i18n="tab.spec"></button>
+        <button data-view="result" data-i18n="tab.result"></button>
+        <span class="grow"></span>
+        <select id="lineSel" class="linesel" style="display:none"
+                data-i18n-title="lines.title">
+          <option value="" data-i18n="line.none"></option>
+          <option value="fitabs" selected data-i18n="line.fitabs"></option>
+          <option value="fit" data-i18n="line.fit"></option>
+          <option value="abs" data-i18n="line.abs"></option>
+          <option value="em" data-i18n="line.em"></option>
+          <option value="allabs" data-i18n="line.allabs"></option>
+          <option value="all" data-i18n="line.all"></option>
+        </select>
+        <span id="pixelBadge" class="badge hidden"></span>
+      </div>
+      <div id="mapView" class="view hidden">
+        <div class="mapwrap">
+          <canvas id="mapCanvas"></canvas>
+          <div id="mapHint" class="maphint" data-i18n="map.hint"></div>
+          <div id="skyReadout"></div>
+        </div>
+      </div>
+      <div id="spectrumView" class="view hidden">
+        <div id="spectrumPlot" class="plotbox"></div>
+      </div>
+      <div id="resultView" class="view hidden">
+        <div id="resultCard" class="rviewbox">
+          <div id="resultEmpty" class="muted small" data-i18n="result.empty"></div>
+          <div id="resultSummary" class="kv hidden"></div>
+
+          <div id="resultTabsWrap" class="tabs hidden">
+            <button data-rtab="native" class="active" data-i18n="rtab.native"></button>
+            <button data-rtab="weights" data-i18n="rtab.weights"></button>
+            <button data-rtab="params" data-i18n="rtab.params"></button>
+            <button data-rtab="gas" data-i18n="rtab.gas"></button>
+            <button data-rtab="log" data-i18n="rtab.log"></button>
+          </div>
+
+          <div id="rNative" class="rview hidden">
+            <div class="imgbox"><img id="nativeImg" class="fitimg" alt="ppxf plot"/></div>
+          </div>
+          <div id="rWeights" class="rview hidden">
+            <div class="wsplit">
+              <div class="imgbox"><img id="weightsImg" class="fitimg" alt="template weights"/></div>
+              <div id="weightsStats" class="small wstats"></div>
+            </div>
+          </div>
+          <div id="rParams" class="rview hidden">
+            <h4 data-i18n="result.comp"></h4>
+            <div id="compTable"></div>
+          </div>
+          <div id="rGas" class="rview hidden">
+            <div id="gasTable"></div>
+          </div>
+          <div id="rLog" class="rview hidden"><pre id="fitLog" class="logbox"></pre></div>
+
+          <div class="row" id="exportRow" style="display:none">
+            <a id="exportJson" class="btn ghost" download data-i18n="result.export.json"></a>
+            <a id="exportFits" class="btn ghost" download data-i18n="result.export.fits"></a>
+          </div>
+        </div>
+      </div>
+      <div id="emptyView" class="view">
+        <div class="empty">
+          <div class="empty-icon">◈</div>
+          <p data-i18n="empty.p1"></p>
+          <p class="small" data-i18n="empty.p2"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 右栏：拟合 ======================= -->
+  <aside id="rightPanel">
+    <section class="card">
+      <h3 data-i18n="card.fit"></h3>
+      <div id="targetInfo" class="muted small" data-i18n="fit.targetNone"></div>
+
+      <div class="formgrid">
+        <label data-i18n="fit.engine"></label>
+        <select id="engineSel">
+          <option value="ppxf_sew" data-i18n="fit.engine.sew"></option>
+          <option value="ppxf" data-i18n="fit.engine.ppxf"></option>
+        </select>
+        <label data-i18n="fit.template"></label><select id="templateSel"></select>
+        <label data-i18n="fit.tplvac"></label>
+        <select id="tplVacSel">
+          <option value="air" data-i18n="data.air"></option>
+          <option value="vacuum">vacuum</option>
+        </select>
+        <label data-i18n="fit.fwhmmode"></label>
+        <select id="fwhmMode">
+          <option value="lambda/R" data-i18n="fwhm.lambdaR"></option>
+          <option value="constant" data-i18n="fwhm.constant"></option>
+          <option value="function" data-i18n="fwhm.function"></option>
+          <option value="scatter" data-i18n="fwhm.scatter"></option>
+        </select>
+        <label id="fwhmFuncLabel" style="display:none" data-i18n="fit.fwhmfunc"></label>
+        <input id="fwhmFunc" type="text" style="display:none"
+               value="lam/7000" data-i18n-ph="fit.fwhmfunc.ph"/>
+        <label id="fwhmLsfLabel" style="display:none" data-i18n="fit.lsfref"></label>
+        <div id="fwhmLsfRow" class="dual" style="display:none">
+          <input id="fwhmLsfPath" type="text"
+                 value="/data/ifspip/DRP_comp/Comp/CSST_IFS_CUBE_163239.2+781153_R1101_LIN_61068.194.fits"/>
+          <button id="fwhmLsfBrowse" class="ghost small" data-i18n="common.browse"></button>
+        </div>
+        <label id="fwhmRLabel" data-i18n="fit.fwhmR"></label>
+        <div id="fwhmRow" class="dual">
+          <input id="fwhmR" type="number" step="any" value="2000" data-i18n-title="fit.r.title"/>
+          <input id="fwhmVal" type="number" step="any" value="2.5" data-i18n-title="fit.fwhmc.title"/>
+        </div>
+        <div id="fwhmRRng" class="span2"><input class="rngsingle" type="range" id="fwhmRR"/></div>
+        <div id="fwhmValRng" class="span2"><input class="rngsingle" type="range" id="fwhmValR"/></div>
+        <label data-i18n="fit.z"></label>
+        <div class="dual">
+          <input id="zValue" type="number" step="any" value="0"/>
+          <label class="chk"><input id="zAuto" type="checkbox" checked/> <span data-i18n="fit.z.auto"></span></label>
+        </div>
+        <div class="span2"><input class="rngsingle" type="range" id="zR"/></div>
+        <label data-i18n="fit.dlam"></label>
+        <select id="dlamModeSel" data-i18n-title="fit.dlam.title">
+          <option value="template" selected data-i18n="fit.dlam.template"></option>
+          <option value="obs" data-i18n="fit.dlam.obs"></option>
+          <option value="custom" data-i18n="fit.dlam.custom"></option>
+        </select>
+        <div id="dlamCustomRow" class="span2" style="display:none">
+          <input id="dlamIn" type="number" step="1e-7" min="0.000002"
+                 max="0.002" value="0.0001" data-i18n-title="fit.dlam.in.title"/>
+        </div>
+        <div id="dlamHint" class="span2 small muted"></div>
+        <label data-i18n="fit.band"></label>
+        <div class="dual">
+          <input id="fitMin" type="number" step="any"/>
+          <span>–</span>
+          <input id="fitMax" type="number" step="any"/>
+        </div>
+        <div class="span2 rngpair">
+          <div class="rngtrack"></div><div class="rngfill"></div>
+          <input type="range" id="fitMinR"/>
+          <input type="range" id="fitMaxR"/>
+        </div>
+        <label>moments</label>
+        <select id="momentsSel"><option value="2">2 (V, σ)</option><option value="4">4 (+h3,h4)</option></select>
+        <label data-i18n="fit.degree"></label><input id="degreeIn" type="number" value="-1"/>
+        <label data-i18n="fit.vrange"></label>
+        <div class="dual"><input id="vminIn" type="number" value="-300"/><input id="vmaxIn" type="number" value="300"/></div>
+        <div class="span2 rngpair">
+          <div class="rngtrack"></div><div class="rngfill"></div>
+          <input type="range" id="vminR"/>
+          <input type="range" id="vmaxR"/>
+        </div>
+        <label data-i18n="fit.sigrange"></label>
+        <div class="dual"><input id="sigMinIn" type="number" value="10"/><input id="sigMaxIn" type="number" value="300"/></div>
+        <div class="span2 rngpair">
+          <div class="rngtrack"></div><div class="rngfill"></div>
+          <input type="range" id="sigMinR"/>
+          <input type="range" id="sigMaxR"/>
+        </div>
+        <label data-i18n="fit.noise"></label>
+        <select id="noiseSel"><option value="file" data-i18n="fit.noise.file"></option><option value="auto" data-i18n="fit.noise.auto"></option></select>
+        <label data-i18n="fit.regul"></label><input id="regulIn" type="number" step="any" value="0"/>
+        <div id="dustBlock" style="display:contents">
+        <label data-i18n="fit.dust"></label>
+        <select id="dustModeSel" data-i18n-title="fit.dust.title">
+          <option value="none" selected data-i18n="dust.none"></option>
+          <option value="calzetti" data-i18n="dust.calzetti"></option>
+          <option value="powerlaw" data-i18n="dust.powerlaw"></option>
+          <option value="kc13">KC13 / Cappellari(2023)</option>
+          <option value="custom" data-i18n="dust.custom"></option>
+        </select>
+        <label data-i18n="fit.dustOn"></label>
+        <select id="dustOnSel">
+          <option value="stars" selected data-i18n="dust.on.stars"></option>
+          <option value="both" data-i18n="dust.on.both"></option>
+        </select>
+        <label data-i18n="fit.dustAv"></label>
+        <div class="dual">
+          <input id="dustAvMin" type="number" step="0.05" value="0"/>
+          <input id="dustAvMax" type="number" step="0.05" value="4"/>
+        </div>
+        <label id="dustSlopeLabel" data-i18n="fit.dustSlope"></label>
+        <div class="dual" id="dustSlopeRow">
+          <input id="dustSlopeMin" type="number" step="0.05" value="-3"/>
+          <input id="dustSlopeMax" type="number" step="0.05" value="1"/>
+        </div>
+        <div class="span2" id="dustExprRow" style="display:none">
+          <input id="dustExpr" type="text" value="av*(lam/5500.)**-0.7"
+                 data-i18n-title="dust.expr.title"/>
+        </div>
+        <div id="dustHint" class="span2 small muted"></div>
+        </div>
+        <div id="dustOffNote" class="span2 small muted" style="display:none" data-i18n="dust.offnote">
+        </div>
+      </div>
+
+      <details id="tplDetails" class="tpl-details">
+        <summary><span data-i18n="tpl.title"></span> <span id="tplStatus" data-i18n="tpl.loading"></span></summary>
+        <div class="row">
+          <input id="tplUrlInput" type="text" style="flex:1;min-width:0"
+                 data-i18n-ph="tpl.url.ph"/>
+        </div>
+        <div class="row">
+          <input id="tplNameInput" type="text" style="width:96px"
+                 data-i18n-ph="tpl.name.ph"/>
+          <button id="tplDownloadBtn" class="ghost" data-i18n="tpl.download"></button>
+          <label class="upload-btn small"><span data-i18n="tpl.upload"></span>
+            <input id="tplUploadInput" type="file" accept=".npz"/>
+          </label>
+          <button id="tplRefreshBtn" class="ghost small" data-i18n="tpl.rescan"></button>
+        </div>
+        <div class="row">
+          <span id="tplDlMsg" class="small muted"></span>
+        </div>
+        <p class="small muted" data-i18n-html="tpl.note"></p>
+      </details>
+
+      <div class="row wrap">
+        <label class="chk"><input id="gasChk" type="checkbox" checked/> <span data-i18n="fit.gas"></span></label>
+        <label class="chk"><input id="tieBalmerChk" type="checkbox"/> <span data-i18n="fit.tieBalmer"></span></label>
+        <label class="chk"><input id="limitDoubletsChk" type="checkbox" checked/> <span data-i18n="fit.limitDoublets"></span></label>
+        <label class="chk" data-i18n-title="fit.maskSync.title"><input id="maskSyncChk" type="checkbox" checked/> <span data-i18n="fit.maskSync"></span></label>
+      </div>
+      <div class="row">
+        <button id="autoZBtn" class="ghost" data-i18n="fit.autoZ"></button>
+        <button id="fitBtn" class="primary grow" data-i18n="fit.run"></button>
+      </div>
+      <div id="fitProgressWrap" class="hidden">
+        <div class="progress"><div id="fitProgress" class="progress-bar"></div></div>
+        <div id="fitMsg" class="small muted"></div>
+      </div>
+      <div id="fitError" class="error hidden"></div>
+    </section>
+  </aside>
+
+  <div id="panelSplitter" class="vsplit" data-i18n-title="splitter.title">
+    <span></span>
+  </div>
+</main>
+
+<!-- ======================= 文件浏览弹窗 ======================= -->
+<div id="browseModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 data-i18n="modal.title"></h3>
+      <button id="browseClose" class="ghost" data-i18n="modal.close"></button>
+    </div>
+    <div class="row">
+      <input id="browsePath" type="text" spellcheck="false"/>
+      <button id="browseGo" class="ghost" data-i18n="modal.go"></button>
+      <button id="browseUp" class="ghost" data-i18n="modal.up"></button>
+    </div>
+    <div class="browselist">
+      <div id="browseDirs"></div>
+      <div id="browseFiles"></div>
+    </div>
+  </div>
+</div>
+
+<div id="refreshTip" class="tip hidden" data-i18n="tip.refreshReset"></div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/i18n.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+data/uploads/
+data/templates/
+__pycache__/
+*.pyc
+*.pyo
+server.log
+*.log
+.env
+.DS_Store
+.ipynb_checkpoints/

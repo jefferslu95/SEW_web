@@ -1,0 +1,15 @@
+# 构建上下文裁剪
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+server.log
+data/uploads/
+data/templates/
+*.fits
+*.fit
+*.fts
+*.npz
+.venv/
+venv/
