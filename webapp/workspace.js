@@ -751,18 +751,47 @@
           </div>
         </div>
         <div class="set-sec">
-          <div class="set-h" data-i18n="set.bridge"></div>
-          <div class="small muted" data-i18n="set.bridgeHint"></div>
-          <div class="row" style="margin-top:6px">
+          <div class="set-h" data-i18n="dep.title"></div>
+          <div class="small muted" data-i18n="dep.desc"></div>
+
+          <div class="dep-step">① <span data-i18n="dep.s1"></span></div>
+          <div class="row">
+            <input id="depSsh" type="text" style="flex:1;min-width:0"
+                   placeholder="user@host" spellcheck="false"/>
+            <input id="depPort" type="text" style="width:92px"
+                   placeholder="8899" spellcheck="false"/>
+          </div>
+
+          <div class="dep-step">② <span data-i18n="dep.s2"></span></div>
+          <div class="row">
+            <input id="depDir" type="text" style="flex:1;min-width:0"
+                   placeholder="~/SEW_web" spellcheck="false"/>
+            <input id="depRoot" type="text" style="flex:1;min-width:0"
+                   placeholder="~/sew-ws" spellcheck="false"/>
+          </div>
+
+          <div class="dep-step">③ <span data-i18n="dep.s3"></span></div>
+          <div class="small muted" data-i18n="dep.aHint"></div>
+          <pre id="setDeployCmd" class="deploycmd"></pre>
+          <div class="small muted" style="margin-top:6px" data-i18n="dep.bHint"></div>
+          <pre id="setDeployCmdB" class="deploycmd"></pre>
+          <div class="row" style="margin-top:4px">
+            <button id="setDeployCopy" class="ghost" data-i18n="dep.copyA"></button>
+            <button id="setDeployCopyB" class="ghost" data-i18n="dep.copyB"></button>
+          </div>
+
+          <div class="row" style="margin-top:8px">
+            <button id="depOpen" class="primary" data-i18n="dep.open"></button>
+            <span class="small muted" data-i18n="dep.openHint"></span>
+          </div>
+
+          <div class="row" style="margin-top:8px">
             <input id="setBridgeUrl" type="text" style="flex:1;min-width:0"
-                   placeholder="http://127.0.0.1:8977"/>
-            <button id="setBridgeGo" class="primary" data-i18n="set.bridgeGo"></button>
+                   placeholder="http://127.0.0.1:8899" spellcheck="false"/>
+            <button id="setBridgeGo" class="primary" data-i18n="dep.ping"></button>
             <button id="setBridgeOff" class="ghost" data-i18n="set.bridgeOff"></button>
           </div>
           <div id="setBridgeMsg" class="small" style="margin-top:4px"></div>
-          <div class="small" style="margin-top:4px">
-            <a href="tools/sew_bridge.py" download data-i18n="set.bridgeGet"></a>
-          </div>
         </div>`;
     el.innerHTML = `
       <div class="wizard-box">
@@ -783,7 +812,7 @@
     const sh = $('setStaticHint');
     if (sh) {
       sh.textContent = T('set.staticHint', { origin: location.origin })
-        + ' ' + T('wiz.staticOnly');
+        + ' ' + T('set.staticUseDep');
     }
 
     const close = () => el.remove();
@@ -844,6 +873,42 @@
         bmsg.textContent = txt || '';
       };
       if (SEWWS.apiBase) say(T('set.bridgeAt', { url: SEWWS.apiBase }), false);
+      // 部署命令：一条命令在服务器上拉代码并启动 run.py（带 CORS 白名单）
+      const cmdEl = $('setDeployCmd');
+      if (cmdEl) {
+        const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+        cmdEl.textContent = 'curl -fsSL ' + base + 'tools/install_remote.sh'
+          + ' | bash -s -- --port 8899 --host 0.0.0.0 --cors ' + location.origin;
+      }
+      const cpBtn = $('setDeployCopy');
+      if (cpBtn) {
+        cpBtn.onclick = async () => {
+          const txt = ($('setDeployCmd') || {}).textContent || '';
+          try {
+            await navigator.clipboard.writeText(txt);
+            say(T('set.deployCopied'), false);
+          } catch (e) { say(T('set.deployCopyFail'), true); }
+        };
+      }
+      const pingBtn = $('setDeployPing');
+      if (pingBtn) {
+        pingBtn.onclick = async () => {
+          const url = (bu.value || '').trim() || SEWWS.apiBase;
+          if (!url) { say(T('set.bridgeEmpty'), true); return; }
+          say(T('set.bridgeBusy'), false);
+          const old = SEWWS.apiBase;
+          SEWWS.setApiBase(url);
+          const info = await SEWWS.detectServer();
+          if (!info) {
+            const why = (SEWWS._lastErr && (SEWWS._lastErr.message
+              || String(SEWWS._lastErr))) || '';
+            SEWWS.apiBase = old;
+            say(T('set.bridgeFail2') + (why ? '  [' + why + ']' : ''), true);
+            return;
+          }
+          say(T('set.bridgeOk', { root: info.root || '' }), false);
+        };
+      }
       $('setBridgeGo').onclick = async () => {
         const url = (bu.value || '').trim();
         if (!url) { say(T('set.bridgeEmpty'), true); return; }
@@ -873,6 +938,94 @@
         SEWWS.setApiBase('');
         location.reload();
       };
+    }
+
+    // ---- 三步部署向导：按输入实时生成两条命令 ----
+    const depSsh = $('depSsh');
+    if (depSsh) {
+      const depPort = $('depPort');
+      const depDir = $('depDir');
+      const depRoot = $('depRoot');
+      const depUrl = $('setBridgeUrl');
+      const dmsg = $('setBridgeMsg');
+      const sayDep = (txt, bad) => {
+        if (!dmsg) return;
+        dmsg.style.color = bad ? '#b91c1c' : '#047857';
+        dmsg.textContent = txt || '';
+      };
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem('sew.deploy') || '{}');
+      } catch (e) { saved = {}; }
+      depSsh.value = saved.ssh || '';
+      depPort.value = saved.port || '8899';
+      depDir.value = saved.dir || '~/SEW_web';
+      depRoot.value = saved.root || '';
+      // 地址默认跟随端口；用户手动改过就不再自动同步
+      let urlAuto = !SEWWS.apiBase;
+      if (depUrl && !depUrl.value) {
+        depUrl.value = 'http://127.0.0.1:' + ((saved.port || '8899'));
+      }
+      if (depUrl) {
+        depUrl.addEventListener('input', () => { urlAuto = false; });
+      }
+
+      const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+      const renderDep = () => {
+        const ssh = (depSsh.value || '').trim() || 'user@host';
+        const port = (depPort.value || '').trim() || '8899';
+        const dir = (depDir.value || '').trim() || '~/SEW_web';
+        const root = (depRoot.value || '').trim();
+        // ① 服务器上执行：拉代码 + 启动 run.py（只监听回环，安全）
+        let a = 'curl -fsSL ' + base + 'tools/install_remote.sh | bash -s --'
+          + ' --host 127.0.0.1 --port ' + port + ' --dir ' + dir
+          + ' --origin ' + location.origin;
+        if (root) a += ' --root ' + root;
+        // ② 本机执行：SSH 隧道，把服务器回环端口映射到本机
+        const b = 'ssh -N -L ' + port + ':127.0.0.1:' + port + ' ' + ssh;
+        const ea = $('setDeployCmd'), eb = $('setDeployCmdB');
+        if (ea) ea.textContent = a;
+        if (eb) eb.textContent = b;
+        if (depUrl && urlAuto) depUrl.value = 'http://127.0.0.1:' + port;
+        try {
+          localStorage.setItem('sew.deploy', JSON.stringify({
+            ssh: depSsh.value, port: depPort.value, dir: depDir.value,
+            root: depRoot.value, url: depUrl ? depUrl.value : '' }));
+        } catch (e) { /* ignore */ }
+      };
+      [depSsh, depPort, depDir, depRoot, depUrl].forEach((el) => {
+        if (el) el.addEventListener('input', renderDep);
+      });
+      renderDep();
+
+      const openBtn = $('depOpen');
+      if (openBtn) {
+        openBtn.onclick = () => {
+          const port = (depPort.value || '8899').trim() || '8899';
+          window.open('http://127.0.0.1:' + port, '_blank');
+        };
+      }
+
+      const cpa = $('setDeployCopy');
+      if (cpa) {
+        cpa.onclick = async () => {
+          const txt = ($('setDeployCmd') || {}).textContent || '';
+          try {
+            await navigator.clipboard.writeText(txt);
+            sayDep(T('dep.copiedA'), false);
+          } catch (e) { sayDep(T('set.deployCopyFail'), true); }
+        };
+      }
+      const cpb = $('setDeployCopyB');
+      if (cpb) {
+        cpb.onclick = async () => {
+          const txt = ($('setDeployCmdB') || {}).textContent || '';
+          try {
+            await navigator.clipboard.writeText(txt);
+            sayDep(T('dep.copiedB'), false);
+          } catch (e) { sayDep(T('set.deployCopyFail'), true); }
+        };
+      }
     }
 
     $('setOpfs').onclick = async () => {

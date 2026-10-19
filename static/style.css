@@ -388,3 +388,10 @@ summary:hover{color:var(--accent)}
 /* 模板下载状态条 */
 #wsDlBox{margin:6px 0 2px}
 #wsDlBox .progress{height:6px}
+
+/* 连接算力服务器：三步部署向导 */
+.dep-step{margin-top:10px;font-weight:600;font-size:13px;color:#334155}
+.deploycmd{margin:4px 0 0;padding:8px 10px;background:#f1f5f9;border:1px solid #e2e8f0;
+  border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all;
+  color:#0f172a;max-height:132px;overflow:auto}

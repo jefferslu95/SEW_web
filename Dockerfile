@@ -21,8 +21,14 @@ ENV PATH=/opt/venv/bin:$PATH
 
 WORKDIR /build
 COPY requirements.txt .
+# 可选：国内镜像源，例 --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_INDEX_URL=
 RUN pip install --upgrade pip setuptools wheel \
- && pip install -r requirements.txt
+ && if [ -n "$PIP_INDEX_URL" ]; then \
+      pip install -i "$PIP_INDEX_URL" -r requirements.txt; \
+    else \
+      pip install -r requirements.txt; \
+    fi
 
 # ---------- 运行阶段 ----------
 FROM python:3.11-slim

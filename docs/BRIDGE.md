@@ -25,8 +25,36 @@
 
 ---
 
-## 用法 A（推荐，需要本机有 Python 3.7+）
+## 用法 0（最简单）：部署 + SSH 转发，直接打开服务器页面
 
+不需要桥，也不需要 CORS。
+
+1. **部署到服务器**（Docker 优先，服务器无需 Python 环境）：
+
+   ```bash
+   curl -fsSL https://jefferslu95.github.io/SEW_web/tools/install_remote.sh \
+     | bash -s -- --host 127.0.0.1 --port 8899 --root ~/sew-ws
+   ```
+
+   脚本会自动：检测 Docker → 构建/复用 `sew-web:latest` 镜像 → 挂载工作区
+   → 以 `--restart unless-stopped` 常驻。没有 Docker 时自动回退到 Python 模式。
+
+2. **本机建隧道**（Windows 自带 OpenSSH）：
+
+   ```bash
+   ssh -N -L 8899:127.0.0.1:8899 user@host
+   ```
+
+3. **浏览器打开** <http://127.0.0.1:8899>
+
+页面内容和 GitHub Pages 版**完全相同**（同一份代码），但算力、工作区、文件都在服务器；
+地址栏是 `127.0.0.1:8899`，属于同源访问，不需要桥、不需要跨域头。
+
+> 页面向导里「打开服务器页面（最简单）」按钮就是做第 3 步。
+
+---
+
+## 用法 A（需要页面地址仍是 github.io）
 ```bash
 git clone https://github.com/jefferslu95/SEW_web.git
 cd SEW_web

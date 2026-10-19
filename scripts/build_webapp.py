@@ -87,12 +87,19 @@ def copy_static():
     for fn in ["style.css", "app.js", "i18n.js"]:
         shutil.copy2(os.path.join(STATIC, fn), os.path.join(OUT, fn))
         print(f"  static/{fn}")
-    # 本地 SSH 桥：一并发布，页面里可直接下载（单文件、仅用标准库）
-    bridge = os.path.join(BASE, "tools", "sew_bridge.py")
-    if os.path.isfile(bridge):
-        os.makedirs(os.path.join(OUT, "tools"), exist_ok=True)
-        shutil.copy2(bridge, os.path.join(OUT, "tools", "sew_bridge.py"))
-        print("  tools/sew_bridge.py")
+    # 本地 SSH 桥 / 一键部署脚本：一并发布，页面里可直接下载或复制命令
+    tools_dir = os.path.join(BASE, "tools")
+    if os.path.isdir(tools_dir):
+        dst_tools = os.path.join(OUT, "tools")
+        os.makedirs(dst_tools, exist_ok=True)
+        for fn in sorted(os.listdir(tools_dir)):
+            if not fn.endswith((".py", ".sh")):
+                continue
+            src = os.path.join(tools_dir, fn)
+            if not os.path.isfile(src):
+                continue
+            shutil.copy2(src, os.path.join(dst_tools, fn))
+            print(f"  tools/{fn}")
     i18n_src = os.path.join(STATIC, "i18n")
     i18n_dst = os.path.join(OUT, "i18n")
     os.makedirs(i18n_dst, exist_ok=True)
