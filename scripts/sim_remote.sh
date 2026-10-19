@@ -19,7 +19,8 @@ SIM="${SEW_SIM_DIR:-/tmp/sew-remote-sim}"
 # 找一个装了 flask + numpy 的解释器（可用 PYTHON=... 覆盖）
 pick_python() {
   local c
-  for c in "${PYTHON:-}" python python3 /home/jflu/anaconda3/bin/python; do
+  for c in "${PYTHON:-}" python python3 "$HOME/anaconda3/bin/python" \
+           "$HOME/miniconda3/bin/python"; do
     [[ -n "$c" ]] || continue
     if command -v "$c" >/dev/null 2>&1 \
        && "$c" -c "import flask, powerbin, ppxf, astropy" >/dev/null 2>&1; then

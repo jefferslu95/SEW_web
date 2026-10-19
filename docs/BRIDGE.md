@@ -58,14 +58,14 @@
 ```bash
 git clone https://github.com/jefferslu95/SEW_web.git
 cd SEW_web
-python tools/sew_bridge.py --ssh jflu@CSST1
+python tools/sew_bridge.py --ssh user@host
 ```
 
 常用参数：
 
 | 参数 | 说明 |
 |---|---|
-| `--ssh jflu@CSST1` | **必填**，SSH 目标（建议先配好免密：`ssh-copy-id`） |
+| `--ssh user@host` | **必填**，SSH 目标（建议先配好免密：`ssh-copy-id`） |
 | `--port 8977` | 本地代理端口（浏览器访问它） |
 | `--remote-port 8899` | 远端 `run.py` 端口（回环） |
 | `--remote-dir ~/SEW_web` | 远端代码目录 |
@@ -93,11 +93,10 @@ cd ~/SEW_web
 python run.py --host 127.0.0.1 --port 8800 \
   --cors https://jefferslu95.github.io --root /path/to/workspace
 ```
-
 本机（Windows 自带 OpenSSH）：
 
 ```powershell
-ssh -N -L 8800:127.0.0.1:8800 jflu@CSST1
+ssh -N -L 8800:127.0.0.1:8800 user@host
 ```
 
 页面里把桥地址填成 `http://127.0.0.1:8800`（这里没有桥，CORS 由 `--cors` 提供）。

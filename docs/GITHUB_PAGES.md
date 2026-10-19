@@ -115,7 +115,7 @@ getent hosts github.com                 # 看 DNS 解析到哪个 IP
 timeout 6 bash -c 'cat < /dev/null > /dev/tcp/github.com/443' && echo 443-OK
 ```
 
-实测（CSST1）：DNS 给的是 `20.205.243.166`，该 IP 的 443 被阻断；但
+实测（本机）：DNS 给的是 `20.205.243.166`，该 IP 的 443 被阻断；但
 `140.82.112.3` / `140.82.113.3` / `20.27.177.113` 等官方 IP 的 443 正常，
 `github.com:22` 与 `ssh.github.com:443` 也可连。**即只有 DNS 指到的那个 IP 坏了。**
 

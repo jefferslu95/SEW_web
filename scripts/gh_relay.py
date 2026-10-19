@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """本地 CONNECT 转发代理：绕过「DNS 解析到不可达 GitHub IP」的问题。
 
-背景（CSST1 实测，2026-10）
+背景（实测，2026-10）
 ---------------------------
 `getent hosts github.com` 返回 20.205.243.166，该 IP 的 443 端口被阻断，
 于是 `git push` 报：

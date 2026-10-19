@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# 本地一键启动（使用 anaconda3 解释器；如无该环境请改 PYTHON）
+# 本地一键启动：优先 $PYTHON，否则用 PATH 里的 python3 / python
 cd "$(dirname "$0")"
-PYTHON="${PYTHON:-/home/jflu/anaconda3/bin/python}"
-exec "$PYTHON" run.py "$@"
+if [[ -n "${PYTHON:-}" ]]; then
+  exec "$PYTHON" run.py "$@"
+fi
+for c in python3 python; do
+  if command -v "$c" >/dev/null 2>&1; then
+    exec "$c" run.py "$@"
+  fi
+done
+echo "找不到 python3，请用 PYTHON=/path/to/python ./start.sh" >&2
+exit 1

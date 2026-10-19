@@ -343,8 +343,6 @@ def samples():
     cands = [
         os.path.join(DATA_DIR, "samples", "spectrum.fit"),
         os.path.join(WEBAPP_DIR, "data", "samples", "spectrum.fit"),
-        "/home/jflu/DGIS/data/ESO154-G023_DATACUBE.fits",
-        "/home/jflu/CCC/ssy_muse/spaxel_1-604053_y63_x27.fits",
     ]
     return jsonify(ok=True, samples=[p for p in cands if os.path.isfile(p)])
 
@@ -360,8 +358,7 @@ def _line_table_candidates():
     env = os.environ.get("SEW_LINE_TABLE") or ""
     return [p for p in (env,
                         os.path.join(DATA_DIR, "line_use.dat"),
-                        os.path.join(WEBAPP_DIR, "data", "line_use.dat"),
-                        "/home/jflu/DGIS/line_use.dat") if p]
+                        os.path.join(WEBAPP_DIR, "data", "line_use.dat")) if p]
 
 
 def _line_table() -> str:

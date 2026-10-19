@@ -140,8 +140,9 @@ def copy_assets():
     except Exception as e:
         print(f"⚠ 未找到 plotly.min.js：{e}")
 
-    # 谱线表
-    line = os.environ.get("SEW_LINE_TABLE") or "/home/jflu/DGIS/line_use.dat"
+    # 谱线表（仓库内置 data/line_use.dat；可用 SEW_LINE_TABLE 覆盖）
+    line = (os.environ.get("SEW_LINE_TABLE")
+            or os.path.join(BASE, "data", "line_use.dat"))
     dst = os.path.join(OUT, "data", "line_use.dat")
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     if os.path.isfile(line):

@@ -17,7 +17,7 @@ flowchart LR
 ## 1. 放到 GitHub
 
 ```bash
-cd /home/jflu/SEW_web
+cd ~/SEW_web
 git init -b main          # 若已 init 可跳过
 git add .
 git commit -m "SEW web: FITS spectrum / cube viewer & fitter"

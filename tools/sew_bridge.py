@@ -26,17 +26,17 @@ GitHub Pages 是唯一界面（静态页，跑在浏览器里，只能看本机�
 用法
 ----
     # 最简：连服务器上的 SEW_web 目录，自动选端口并拉起源码
-    python sew_bridge.py --ssh jflu@CSST1
+    python sew_bridge.py --ssh user@host
 
     # 指定远端代码目录与工作区
-    python sew_bridge.py --ssh jflu@CSST1 \\
-        --remote-dir ~/SEW_web --remote-root /home/jflu/sew-ws2
+    python sew_bridge.py --ssh user@host \\
+        --remote-dir ~/SEW_web --remote-root ~/sew-ws
 
     # 额外放行别的来源（可重复）
-    python sew_bridge.py --ssh jflu@CSST1 --origin http://localhost:8080
+    python sew_bridge.py --ssh user@host --origin http://localhost:8080
 
     # 远端已经有实例在跑（自己起的），只做转发：
-    python sew_bridge.py --ssh jflu@CSST1 --remote-port 8800 --no-autostart
+    python sew_bridge.py --ssh user@host --remote-port 8800 --no-autostart
 
 打印出的地址填到页面「连接算力服务器」里即可（或加 ?bridge=http://127.0.0.1:8977）。
 """
@@ -188,7 +188,7 @@ class Proxy(BaseHTTPRequestHandler):
 def main() -> int:
     ap = argparse.ArgumentParser(description="SEWweb 本地 SSH 桥")
     ap.add_argument("--ssh", required=True,
-                    help="SSH 目标，如 jflu@CSST1")
+                    help="SSH 目标，如 user@host")
     ap.add_argument("--port", type=int, default=8977,
                     help="本地代理端口（浏览器访问它），默认 8977")
     ap.add_argument("--remote-port", type=int, default=8899,
