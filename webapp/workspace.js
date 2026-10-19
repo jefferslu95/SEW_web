@@ -739,6 +739,10 @@
             <button id="setSrvApply" class="primary" data-i18n="set.apply"></button>
           </div>
           <div id="setSrvWhere" class="small muted" style="margin-top:4px"></div>
+          <div class="row" style="margin-top:8px">
+            <button id="setBackLocal" class="ghost" data-i18n="set.backLocal"></button>
+            <span class="small muted" data-i18n="set.backLocalHint"></span>
+          </div>
         </div>`
       : `
         <div class="set-sec">
@@ -836,6 +840,20 @@
           if (inp) inp.value = p;
         });
       };
+
+      const backBtn = $('setBackLocal');
+      if (backBtn) {
+        backBtn.onclick = async () => {
+          // 清掉 API 端点 + 服务器状态；重新加载后自动回退到本机目录
+          SEWWS.setApiBase('');
+          SEWWS.server = null;
+          SEWWS.backend = 'browser';
+          SEWWS.dirName = '';
+          SEWWS.compute = 'browser';
+          try { await SEWWS.setPref('browser'); } catch (e) { /* ignore */ }
+          location.reload();
+        };
+      }
 
       $('setSrvApply').onclick = async () => {
         const path = ($('setSrvPath').value || '').trim();

@@ -381,6 +381,8 @@
   "collapse.title.ws": "Expand / collapse workspace",
   "set.staticHint": "This page is a plain static deployment ({origin}) with no server backend, so “Choose folder” opens folders on this computer.",
   "set.serverAt": "Server API: {url}",
+  "set.backLocal": "Switch back to this computer",
+  "set.backLocalHint": "Clears the server address and reloads; your previously authorised local folder is kept.",
   "set.staticUseDep": "To compute and read/write files on a server, use the “Connect a compute server” wizard below.",
   "dep.title": "Connect a compute server (deploy wizard)",
   "dep.desc": "This page is static and cannot open SSH by itself. Three steps: (1) server address; (2) deploy/workspace folders; (3) run the two generated commands, then click Check & connect. Afterwards the page talks to run.py over HTTP and both compute and files live on that server.",
