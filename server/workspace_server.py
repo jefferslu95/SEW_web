@@ -197,16 +197,13 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> int:
     ap = argparse.ArgumentParser(description="SEW web 静态站点 + 服务器工作区（不计算）")
     ap.add_argument("--root", default=None, help="工作区根目录")
-    ap.add_argument("--allow-root", action="append", default=[],
-                    help="允许浏览/作为工作区的目录（可多次），默认 root 与 $HOME")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8790)
     ap.add_argument("--token", default=None,
                     help="可选访问口令（也可用环境变量 SEW_WORKSPACE_TOKEN）")
     args = ap.parse_args()
 
-    wsmod.init(root=args.root or os.path.expanduser("~/sew-workspace"),
-               allow_roots=args.allow_root or None,
+    wsmod.init(root=args.root or "",
                token=args.token if args.token is not None
                else os.environ.get("SEW_WORKSPACE_TOKEN") or "",
                compute="browser")

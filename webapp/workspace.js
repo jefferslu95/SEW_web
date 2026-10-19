@@ -75,7 +75,7 @@
       this.backend = 'server';
       this.compute = this.server.compute || 'browser';
       this.dir = null;
-      this.dirName = this.server.root;
+      this.dirName = this.server.root || '';
       return this.server;
     },
 
@@ -363,9 +363,9 @@
     // 1) 页面由带后端的服务器提供（同源有 /api/ws/*）：算力与工作区就在这台服务器。
     //    这是唯一的“服务器模式”判定——不连接其他机器，也不让算力/工作区跑到访问者本机。
     const srv = await SEWWS.detectServer();
-    if (srv && srv.writable) {
+    if (srv) {
       SEWWS.useServer(srv);
-      return { restored: true, server: true };
+      return { restored: true, server: true, needDir: !srv.root };
     }
     // 2) 纯静态页面（无后端）：算力与工作区都在当前浏览器（同源本地）
     // 3) 上次选过的本地目录（未授权则等用户点按钮）
@@ -532,9 +532,23 @@
 
   /* ================= 工作区设置面板（点左上角 SEWweb） ================= */
   function currentLabel() {
-    if (SEWWS.backend === 'server') return T('ws.srvAt', { root: SEWWS.dirName });
+    if (SEWWS.backend === 'server') {
+      return SEWWS.dirName ? T('ws.srvAt', { root: SEWWS.dirName })
+        : T('ws.unset');
+    }
     if (SEWWS.backend === 'local') return T('ws.dirAt', { name: SEWWS.dirName });
     return T('ws.dirNone');
+  }
+
+  /* 顶部状态栏：算力 · 工作区（i18n 就绪后再设，避免出现 key） */
+  function applyHostStatus() {
+    if (typeof window.setStatus !== 'function') return;
+    if (SEWWS.serverCompute()) {
+      window.setStatus(T('hdr.compute.srv',
+        { root: SEWWS.dirName || T('ws.unsetShort') }));
+    } else if (SEWWS.dirName) {
+      window.setStatus(T('hdr.compute.loc', { root: SEWWS.dirName }));
+    }
   }
 
   let srvWhenOpened = null;   // 打开设置面板时的算力归属（用于判断是否需要重载）
@@ -549,13 +563,7 @@
     try { if (typeof afterBoot === 'function') await afterBoot(); }
     catch (e) { console.warn(e); }
     // 状态栏跟着工作区走
-    if (typeof window.setStatus === 'function') {
-      if (SEWWS.serverCompute()) {
-        window.setStatus(T('hdr.compute.srv', { root: SEWWS.dirName || '' }));
-      } else if (!SEWWS.serverCompute() && SEWWS.dirName) {
-        window.setStatus(T('hdr.compute.loc', { root: SEWWS.dirName }));
-      }
-    }
+    applyHostStatus();
     if (window.toast) window.toast(msg || T('set.changed'));
   }
 
@@ -769,6 +777,15 @@
   SEWWS.ready = preInitP.then(async (st) => {
     const restored = !!(st && st.restored);
     const serverMode = !!(st && st.server);
+    const needDir = !!(st && st.needDir);
+    // 等 i18n 加载完再写状态栏
+    setTimeout(applyHostStatus, 60);
+    setTimeout(applyHostStatus, 1500);
+    if (needDir) {
+      // 服务器模式但没有工作区目录：引导用户设置（不自动创建任何目录）
+      setTimeout(applyHostStatus, 60);
+      setTimeout(() => { openSettings().catch(() => {}); }, 300);
+    }
     // 第一次进入（没有服务器工作区、没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
     let wantMirror = false;
     let skipped = false;

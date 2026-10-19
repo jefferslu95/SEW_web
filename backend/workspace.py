@@ -15,7 +15,8 @@
     <root>/data       导入的 FITS
     <root>/workspace.json
 
-安全：所有可切换/可浏览的目录都必须在 ``allow_roots`` 白名单内。
+安全：默认**不限制**目录（本工具是单用户本地/SSH 转发工具，工作区就是你自己的
+目录）；如有需要，可用环境变量 ``SEW_WS_ALLOW``（路径分隔符分隔）显式收窄范围。
 """
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ MAX_BODY = 4 * 1024 * 1024 * 1024        # 4 GB
 class Cfg:
     """全局配置（进程内单例）。"""
 
-    root = os.path.expanduser("~/sew-workspace")
+    root = ""                 # 默认空：由用户在工作区设置里选
     allow_roots: list = []
     token = ""
     compute = "browser"      # 'server' | 'browser'
@@ -40,18 +41,11 @@ class Cfg:
 
 
 def init(root=None, allow_roots=None, token=None, compute=None):
-    """初始化：root 先规范化，allow_roots 默认 [root, $HOME]。"""
-    if root:
-        Cfg.root = os.path.abspath(os.path.expanduser(str(root)))
-    Cfg.root = os.path.abspath(os.path.expanduser(Cfg.root))
+    """初始化：root 为空表示尚未设置（不自动创建任何目录）。"""
+    Cfg.root = os.path.abspath(os.path.expanduser(str(root))) if root else ""
 
-    roots = [os.path.abspath(os.path.expanduser(p))
-             for p in (allow_roots or []) if str(p).strip()]
-    if not roots:
-        roots = [Cfg.root, os.path.expanduser("~")]
-    if Cfg.root not in roots:
-        roots.insert(0, Cfg.root)
-    Cfg.allow_roots = roots
+    Cfg.allow_roots = [os.path.abspath(os.path.expanduser(p))
+                       for p in (allow_roots or []) if str(p).strip()]
 
     if token is not None:
         Cfg.token = str(token or "")
@@ -60,6 +54,9 @@ def init(root=None, allow_roots=None, token=None, compute=None):
 
 
 def in_allow_roots(path: str) -> bool:
+    """未设置白名单时一律允许（单用户工具）；设置后只允许白名单内。"""
+    if not Cfg.allow_roots:
+        return True
     rp = os.path.realpath(path)
     for r in Cfg.allow_roots:
         rr = os.path.realpath(r)
@@ -79,6 +76,8 @@ def safe_dir(d: str) -> str:
     d = str(d or "").strip("/")
     if d not in SUBDIRS:
         raise ValueError(f"未知目录: {d}")
+    if not Cfg.root:
+        raise ValueError("尚未设置工作区目录")
     return os.path.join(Cfg.root, d)
 
 
@@ -88,6 +87,8 @@ def workspace_path(sub: str, name: str) -> str:
 
 
 def ensure_dirs():
+    if not Cfg.root:
+        return
     for sub in SUBDIRS:
         os.makedirs(os.path.join(Cfg.root, sub), exist_ok=True)
     info_file = os.path.join(Cfg.root, "workspace.json")
@@ -101,6 +102,8 @@ def ensure_dirs():
 
 
 def used_bytes() -> int:
+    if not Cfg.root:
+        return 0
     total = 0
     for sub in SUBDIRS:
         for root, _dirs, files in os.walk(os.path.join(Cfg.root, sub)):
@@ -113,15 +116,17 @@ def used_bytes() -> int:
 
 
 def info() -> dict:
+    writable = bool(Cfg.root) and os.access(Cfg.root, os.W_OK)
     return dict(ok=True, root=Cfg.root, dirs=list(SUBDIRS),
-                writable=os.access(os.path.dirname(Cfg.root) or "/", os.W_OK),
+                configured=bool(Cfg.root), writable=writable,
                 used_bytes=used_bytes(), auth=bool(Cfg.token),
-                compute=Cfg.compute,
-                roots=[os.path.realpath(r) for r in Cfg.allow_roots])
+                compute=Cfg.compute)
 
 
 def _roots_hint() -> str:
-    return "（允许范围: " + ", ".join(Cfg.allow_roots) + "）"
+    if not Cfg.allow_roots:
+        return ""
+    return "（限制范围: " + ", ".join(Cfg.allow_roots) + "）"
 
 
 def set_root(new_root: str) -> dict:
@@ -138,7 +143,7 @@ def set_root(new_root: str) -> dict:
 
 def browse(path: str = "") -> dict:
     target = os.path.abspath(os.path.expanduser(path)) if str(path or "").strip() \
-        else Cfg.root
+        else (Cfg.root or os.path.expanduser("~"))
     if not in_allow_roots(target):
         raise PermissionError(f"路径不在允许范围内: {target}" + _roots_hint())
     if not os.path.isdir(target):
@@ -162,10 +167,9 @@ def browse(path: str = "") -> dict:
     dirs.sort(key=lambda x: x["name"].lower())
     files.sort(key=lambda x: x["name"].lower())
     parent = os.path.dirname(target)
-    if parent == target or not in_allow_roots(parent):
+    if parent == target:
         parent = target
-    return dict(ok=True, path=target, parent=parent, dirs=dirs, files=files,
-                roots=[os.path.realpath(r) for r in Cfg.allow_roots])
+    return dict(ok=True, path=target, parent=parent, dirs=dirs, files=files)
 
 
 def list_dir(d: str) -> dict:

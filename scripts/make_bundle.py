@@ -37,14 +37,13 @@ DEPLOY_TXT = """SEW web — 服务器算力版部署说明
 1) 前置依赖（任选其一）
    pip install ppxf ppxf-sew powerbin capfit flask astropy numpy scipy matplotlib plotly
 
-2) 启动（工作区与程序目录分离，推荐放在数据盘）
-   python run.py --root /data/sew-ws --port 8765 \\
-       --allow-root /data --allow-root $HOME
+2) 启动（工作区与程序目录分离；不指定 --root 时在页面上选目录）
+   python run.py --port 8765                # 工作区在页面上选
+   python run.py --root /data/sew-ws        # 或预设
 
    参数：
-     --root        工作区根目录（templates/ results/ data/ 自动创建）
-     --allow-root  允许多次切换/浏览的目录（白名单），可重复
-     --token       可选口令（/api/ws/* 需要 X-SEW-Token）
+     --root        预设工作区根目录（templates/ results/ data/ 自动创建）
+     --token       可选口令（/api/* 需要 X-SEW-Token）
 
 3) 从自己的电脑通过 SSH 转发访问
    ssh -N -L 8765:127.0.0.1:8765 user@server
@@ -53,7 +52,7 @@ DEPLOY_TXT = """SEW web — 服务器算力版部署说明
 说明：
   * 本版本计算完全在服务器（ppxf），浏览器不下载任何 Python 运行时。
   * 打开 FITS 只传路径，不需要把数据传到浏览器。
-  * 「工作区设置」（点左上角 SEWweb 图标）可随时改 --root 白名单内的目录。
+  * 「工作区设置」（点左上角 SEWweb 图标）可随时改工作区目录（带目录浏览面板）。
 """
 
 

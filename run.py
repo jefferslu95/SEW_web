@@ -28,7 +28,7 @@ def main():
     ap.add_argument("--open", action="store_true", help="启动后打开浏览器")
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--root", default=None,
-                    help="服务器工作区根目录（默认 ~/sew-workspace）")
+                    help="预设服务器工作区根目录（默认不预设，在页面上选）")
     ap.add_argument("--token", default=None,
                     help="服务器工作区口令（也可用 SEW_WORKSPACE_TOKEN）")
     ap.add_argument("--cors", default=None,

@@ -101,7 +101,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
   try {
     const h = await api('/api/health');
-    setStatus(`pPXF ${h.ppxf} · ppxf-sew ${h.ppxf_sew}`);
+    // 服务器模式：状态栏留给「算力/工作区」提示，不覆盖
+    const ws = window.SEWWS;
+    if (!(ws && typeof ws.serverCompute === 'function' && ws.serverCompute())) {
+      setStatus(`pPXF ${h.ppxf} · ppxf-sew ${h.ppxf_sew}`);
+    }
   } catch (e) {
     setStatus(t('status.backend', { msg: e.message }), true);
   }

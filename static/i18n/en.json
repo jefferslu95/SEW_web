@@ -375,5 +375,8 @@
   "hdr.compute.loc": "Compute: this browser · Workspace: {root}",
   "collapse.title.ws": "Expand / collapse workspace",
   "set.staticHint": "This page is a plain static deployment ({origin}) with no server backend, so “Choose folder” opens folders on this computer. To use folders on a server, open the page served by that server (run run.py there).",
-  "set.serverAt": "Served by: {url}"
+  "set.serverAt": "Served by: {url}",
+  "ws.unset": "Workspace: not set",
+  "ws.unsetShort": "not set",
+  "ws.unsetHint": "Workspace is not set yet. Click the SEWweb logo to choose a folder."
 }

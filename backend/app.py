@@ -39,12 +39,13 @@ def _page_dir() -> str:
         return WEBAPP_DIR
     return STATIC_DIR
 
-# 服务器工作区：默认 ~/sew-workspace；可用 SEW_WS_ROOT 覆盖
+# 服务器工作区：默认**不设**（由用户在工作区设置里选）；可用 SEW_WS_ROOT 预设
 wsmod.init(root=os.environ.get("SEW_WS_ROOT") or None,
            token=os.environ.get("SEW_WORKSPACE_TOKEN") or "",
            compute="server")
 # 模板库优先读工作区 <root>/templates（随 /api/ws/root 切换动态生效）
-templates.set_runtime_dir(os.path.join(wsmod.Cfg.root, "templates"))
+templates.set_runtime_dir(os.path.join(wsmod.Cfg.root, "templates")
+                          if wsmod.Cfg.root else None)
 try:
     wsmod.ensure_dirs()
 except OSError:

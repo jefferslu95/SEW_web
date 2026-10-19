@@ -650,7 +650,16 @@
     if (!details) return;
     let tpls, fits, results;
     if (computeOnServer()) {
-      // 服务器算力：模板/数据以 <root>/templates|data 为准，下载后刷新即出现
+      // 服务器算力：默认不预设工作区；未设置时只显示提示
+      const ws = window.SEWWS;
+      if (!ws || !ws.dirName) {
+        ['wsTplList', 'wsAvailList', 'wsFileList', 'wsResList'].forEach((id) => {
+          const el = $(id); if (el) el.innerHTML = '';
+        });
+        const st0 = $('wsStatus');
+        if (st0) st0.textContent = t('ws.unsetHint');
+        return;
+      }
       const [tf, df, rs] = await Promise.all([
         serverList('templates'), serverList('data'), WS.all('results')]);
       tpls = tf.map((f) => ({ name: f.name, size: f.size, kind: KIND_TPL }));
@@ -839,11 +848,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     const p = $('pathInput');
     bindWorkspaceUI().then(() => {
-      if (computeOnServer()) {
-        // 顶部明确显示：算力在哪、工作区在哪
-        const ws = window.SEWWS;
-        setBootMsg(t('hdr.compute.srv', { root: (ws && ws.dirName) || '' }));
-      } else if (p && window.t) {
+      if (p && window.t && !computeOnServer()) {
         // 浏览器端没有「服务器路径」概念，改提示
         p.placeholder = t('hdr.path.ph.wasm');
       }
