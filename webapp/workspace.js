@@ -422,10 +422,12 @@
     const srv = await SEWWS.detectServer();
     if (srv) {
       SEWWS.useServer(srv);
-      return { restored: true, server: true, needDir: !srv.root };
+      return { restored: true, server: true, needDir: !srv.root, pref: 'server' };
     }
     // 2) 纯静态页面（无后端）：算力与工作区都在当前浏览器（同源本地）
     // 3) 上次选过的本地目录（未授权则等用户点按钮）
+    let pref = '';
+    try { pref = (await SEWWS._metaGet('backend')) || ''; } catch (e) { /* ignore */ }
     let restored = false;
     try { restored = await SEWWS.restoreDir(true); } catch (e) { /* ignore */ }
     if (restored) {
@@ -433,7 +435,7 @@
       const n = await SEWWS.restoreVendorFromDir().catch(() => 0);
       if (n) console.log(`从工作区恢复了 ${n} 个依赖文件到缓存`);
     }
-    return { restored, server: false };
+    return { restored, server: false, pref };
   }
   /* ================= 首次引导 ================= */
   function buildWizard() {
@@ -1129,25 +1131,21 @@
     const restored = !!(st && st.restored);
     const serverMode = !!(st && st.server);
     const needDir = !!(st && st.needDir);
+    const pref = (st && st.pref) || '';
     // 等 i18n 加载完再写状态栏
     setTimeout(applyHostStatus, 60);
     setTimeout(applyHostStatus, 1500);
-    if (needDir) {
-      // 不再自动弹窗：只在状态栏与 toast 里提示入口（点左上角 SEWWweb 进设置）
-      setTimeout(applyHostStatus, 60);
-      setTimeout(() => {
-        if (window.toast) window.toast(T('ws.needDirHint'));
-      }, 700);
+    // ★ 刚打开但没有可用工作区 → 默认弹出「工作区设置」面板（引导选目录）。
+    //   已确定过的就不再弹：服务器工作区已有 root、或上次选了本地目录、
+    //   或上次明确选了“仅用浏览器存储”。
+    const needPick = needDir
+      || (!restored && !serverMode && pref !== 'browser');
+    if (needPick) {
+      setTimeout(() => { openSettings().catch(() => {}); }, 400);
     }
-    // 首次进入不弹窗，只在状态栏/toast 里提示入口（见下面 else if）
     let wantMirror = false;
     if (restored) {
       wantMirror = SEWWS.backend === 'local';
-    } else if (!serverMode) {
-      // 首次进入：不弹向导，只给一句提示（不设置也能用，数据在浏览器里）
-      setTimeout(() => {
-        if (window.toast) window.toast(T('ws.firstHint'));
-      }, 900);
     }
     if (SEWWS.dir || SEWWS.backend === 'server') {
       // 刚选定工作区：把面板状态与已有文件同步过来
