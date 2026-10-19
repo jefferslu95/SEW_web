@@ -82,7 +82,7 @@
         if (!j.ok) return null;
         this.server = j;
         return j;
-      } catch (e) { return null; }
+      } catch (e) { this._lastErr = e; return null; }
     },
 
     useServer(info) {
@@ -759,6 +759,7 @@
             <button id="setBridgeGo" class="primary" data-i18n="set.bridgeGo"></button>
             <button id="setBridgeOff" class="ghost" data-i18n="set.bridgeOff"></button>
           </div>
+          <div id="setBridgeMsg" class="small" style="margin-top:4px"></div>
           <div class="small" style="margin-top:4px">
             <a href="tools/sew_bridge.py" download data-i18n="set.bridgeGet"></a>
           </div>
@@ -836,18 +837,36 @@
     const bu = $('setBridgeUrl');
     if (bu) {
       bu.value = SEWWS.apiBase || '';
+      const bmsg = $('setBridgeMsg');
+      const say = (txt, bad) => {
+        if (!bmsg) return;
+        bmsg.style.color = bad ? '#b91c1c' : '#047857';
+        bmsg.textContent = txt || '';
+      };
+      if (SEWWS.apiBase) say(T('set.bridgeAt', { url: SEWWS.apiBase }), false);
       $('setBridgeGo').onclick = async () => {
         const url = (bu.value || '').trim();
-        if (!url) return;
+        if (!url) { say(T('set.bridgeEmpty'), true); return; }
+        const btn = $('setBridgeGo');
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = T('set.bridgeBusy');
+        say(T('set.bridgeBusy'), false);
         SEWWS.setApiBase(url);
         const info = await SEWWS.detectServer();
+        btn.disabled = false;
+        btn.textContent = label;
         if (!info) {
+          const why = (SEWWS._lastErr && (SEWWS._lastErr.message
+            || String(SEWWS._lastErr))) || '';
           SEWWS.setApiBase('');
+          say(T('set.bridgeFail2') + (why ? '  [' + why + ']' : ''), true);
           if (window.toast) window.toast(T('set.bridgeFail'), 'err');
           return;
         }
         SEWWS.useServer(info);
         await SEWWS.setPref('server');
+        say(T('set.bridgeOk', { root: info.root || '' }), false);
         location.reload();          // 算力归属变了：重载最干净
       };
       $('setBridgeOff').onclick = () => {
