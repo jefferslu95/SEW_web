@@ -21,6 +21,12 @@
   const SUBDIRS = ['templates', 'results', 'data', 'cache'];
 
   const FS_SUPPORTED = typeof window.showDirectoryPicker === 'function';
+  // VS Code 内置浏览器（尤其 Remote-SSH）会把 File System Access 的目录对话框
+  // 交给远端扩展宿主，列出来的是服务器上的目录，而不是用户本机的目录。
+  // 这种情况下提示用户改用本机 Chrome / Edge 打开本页。
+  const HOSTED_BY_VSCODE = /Electron/i.test(navigator.userAgent)
+    || location.protocol === 'vscode-webview:'
+    || /^vscode-webview/i.test(String(location.origin));
 
   const SEWWS = {
     supported: FS_SUPPORTED,
@@ -164,7 +170,7 @@
 
     /* ---------------- 目录选择 / 恢复 ---------------- */
     async pickDir(silent) {
-      if (!FS_SUPPORTED) throw new Error('浏览器不支持目录访问');
+      if (!FS_SUPPORTED) throw new Error(T('wiz.unsupported'));
       const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
       this.dir = handle;
       this.dirName = handle.name;
@@ -399,6 +405,7 @@
           <button id="wizOpfs" class="ghost" data-i18n="wiz.opfs"></button>
           <button id="wizSkip" class="ghost" data-i18n="wiz.skip"></button>
         </div>
+        <div id="wizHost" class="small" style="color:#b45309;margin-top:6px"></div>
         <div id="wizInfo" class="small muted"></div>
         <label class="chk small"><input id="wizMirror" type="checkbox" checked/>
           <span data-i18n="wiz.mirror"></span></label>
@@ -415,6 +422,9 @@
     return new Promise((resolve) => {
       const w = buildWizard();
       const info = () => $('wizInfo');
+      if (HOSTED_BY_VSCODE && $('wizHost')) {
+        $('wizHost').textContent = T('wiz.vscodeDir');
+      }
       $('wizPick').onclick = async () => {
         try {
           const h = await SEWWS.pickDir();
@@ -422,7 +432,9 @@
           await SEWWS.setPref('local');
           info().textContent = T('wiz.chosen', { name: h.name });
         } catch (e) {
-          info().textContent = String(e.message || e);
+          info().textContent = (e && e.name === 'AbortError')
+            ? T('wiz.pickAbort')
+            : String(e.message || e);
         }
       };
       $('wizSkip').onclick = async () => {
@@ -699,7 +711,10 @@
     const paint = () => { cur.textContent = currentLabel(); };
     paint();
     const sh = $('setStaticHint');
-    if (sh) sh.textContent = T('set.staticHint', { origin: location.origin });
+    if (sh) {
+      sh.textContent = T('set.staticHint', { origin: location.origin })
+        + (HOSTED_BY_VSCODE ? ' ' + T('wiz.vscodeDir') : '');
+    }
 
     const close = () => el.remove();
     $('setClose').onclick = close;

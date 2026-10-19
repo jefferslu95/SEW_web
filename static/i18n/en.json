@@ -353,6 +353,8 @@
   "wiz.chosen": "Selected: {name}",
   "wiz.browserOnly": "Using browser storage only; clearing site data removes everything.",
   "wiz.unsupported": "This browser cannot access folders; using browser storage only.",
+  "wiz.vscodeDir": "Note: VS Code's built-in browser hands the folder dialog to the remote host, so it lists folders on the SSH server. To choose a folder on your own computer, open this page in Chrome / Edge on your local machine.",
+  "wiz.pickAbort": "Folder selection cancelled.",
   "wiz.server": "Server workspace",
   "wiz.serverChosen": "Server workspace: {root}",
   "wiz.tokenAsk": "Server workspace token",
