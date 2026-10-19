@@ -166,8 +166,12 @@ def load_registry():
         return {}
 
 
-def download_template(name: str, url: str, timeout=120, progress=None):
-    """下载模板到 data/templates。返回最终路径。"""
+def download_template(name: str, url: str, timeout=60, progress=None):
+    """下载模板到工作区 templates/（默认源见 webapp/templates/manifest.json）。
+
+    ``timeout`` 是「单次读取超时」：只要还有数据在流动就不会触发；
+    这里用 ``read1`` 小步读取，保证进度回调能及时更新（大文件/慢链路也适用）。
+    """
     if not url or not str(url).lower().startswith(("http://", "https://")):
         raise ValueError("请提供 http(s) 模板下载地址")
     local = tpl_local()
@@ -178,25 +182,30 @@ def download_template(name: str, url: str, timeout=120, progress=None):
     dst = os.path.join(local, fn)
     tmp = dst + ".part"
     req = urllib.request.Request(url, headers={"User-Agent": "SEW-web/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r, open(tmp, "wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
-        done = 0
-        while True:
-            chunk = r.read(1024 * 1024)
-            if not chunk:
-                break
-            f.write(chunk)
-            done += len(chunk)
-            if progress:
-                progress(done, total)
-    if not _npz_keys_ok(tmp):
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r, \
+                open(tmp, "wb") as f:
+            total = int(r.headers.get("Content-Length") or 0)
+            done = 0
+            while True:
+                chunk = r.read1(1 << 16)
+                if not chunk:
+                    break
+                f.write(chunk)
+                done += len(chunk)
+                if progress:
+                    progress(done, total)
+        if not _npz_keys_ok(tmp):
+            raise ValueError("下载的文件不是有效的 ppxf 模板 npz（缺少 "
+                             "templates/lam/ages/metals/fwhm）")
+        os.replace(tmp, dst)
+    except Exception:
+        # 失败时不要留下半截 .part 文件
         try:
             os.remove(tmp)
         except OSError:
             pass
-        raise ValueError("下载的文件不是有效的 ppxf 模板 npz（缺少 "
-                         "templates/lam/ages/metals/fwhm）")
-    os.replace(tmp, dst)
+        raise
     return dst
 
 

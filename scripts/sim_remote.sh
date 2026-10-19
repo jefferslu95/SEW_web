@@ -48,11 +48,6 @@ echo "[4/4] 启动（工作区 $SIM/work，端口 $PORT）"
 cd "$SIM/opt/sew-web-server"
 # 依赖装在用户 site-packages 时，改 HOME 会找不到 —— 显式加进 PYTHONPATH
 EXTRA="${SEW_SIM_PYTHONPATH:-$HOME/.local/lib/python3.$( "$PY" -c 'import sys;print(sys.version_info[1])' )/site-packages}"
-# 允许切换/浏览的目录：隔离目录 + 真实 $HOME（可用 SEW_SIM_ALLOW 覆盖，冒号分隔）
-ALLOW="${SEW_SIM_ALLOW:-$SIM:$HOME}"
-ALLOW_ARGS=()
-IFS=':' read -ra _parts <<< "$ALLOW"
-for p in "${_parts[@]}"; do [[ -n "$p" ]] && ALLOW_ARGS+=(--allow-root "$p"); done
 HOME="$SIM/home" PYTHONPATH="$EXTRA" OMP_NUM_THREADS=1 \
   exec "$PY" run.py --host 127.0.0.1 --port "$PORT" \
-  --root "$SIM/work" "${ALLOW_ARGS[@]}"
+  --root "$SIM/work"
