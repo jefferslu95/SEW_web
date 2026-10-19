@@ -42,6 +42,39 @@ def _download(url: str, dst: str) -> int:
     return os.path.getsize(dst)
 
 
+# plotly.js：前端绘图用，index.html 直接引用 vendor/plotly.min.js。
+# vendor/ 不进 git，所以构建时必须自己拉一份，否则页面会缺绘图能力。
+PLOTLY_VER = "2.12.1"
+PLOTLY_DST = os.path.join(BASE_DIR, "webapp", "vendor", "plotly.min.js")
+PLOTLY_URLS = [
+    f"https://cdn.jsdelivr.net/npm/plotly.js-dist-min@{PLOTLY_VER}/plotly.min.js",
+    f"https://unpkg.com/plotly.js-dist-min@{PLOTLY_VER}/plotly.min.js",
+]
+
+
+def ensure_plotly(min_bytes: int = 1_000_000) -> None:
+    """确保 webapp/vendor/plotly.min.js 存在（已存在则跳过）。"""
+    if os.path.exists(PLOTLY_DST) and os.path.getsize(PLOTLY_DST) >= min_bytes:
+        print(f"  plotly.min.js 已存在 {os.path.getsize(PLOTLY_DST)/1e6:.1f} MB")
+        return
+    last = None
+    for url in PLOTLY_URLS:
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r, \
+                    open(PLOTLY_DST, "wb") as f:
+                f.write(r.read())
+            size = os.path.getsize(PLOTLY_DST)
+            if size < min_bytes:
+                raise IOError(f"下载内容过小：{size} 字节")
+            print(f"  plotly.min.js {size/1e6:.1f} MB  ← {url}")
+            return
+        except Exception as exc:      # noqa: BLE001 - 逐个源重试
+            last = exc
+            if os.path.exists(PLOTLY_DST):
+                os.remove(PLOTLY_DST)
+    raise SystemExit(f"下载 plotly.min.js 失败：{last}")
+
+
 def main() -> int:
     os.makedirs(OUT, exist_ok=True)
     os.makedirs(WHEELS, exist_ok=True)
@@ -67,6 +100,8 @@ def main() -> int:
             print(f"  {f}  {n/1e6:.1f} MB")
         total += n
     print(f"Pyodide 运行时：{len(files)} 个文件，新下载 {total/1e6:.1f} MB")
+
+    ensure_plotly()
 
     import subprocess
     cmd = [sys.executable, "-m", "pip", "download", "-q", "--no-deps",
