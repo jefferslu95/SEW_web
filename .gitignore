@@ -25,3 +25,6 @@ webapp/py/backend/fits_io.py
 webapp/py/backend/fitting.py
 webapp/py/backend/templates.py
 webapp/py/backend/binning.py
+
+# 部署包产物
+dist/

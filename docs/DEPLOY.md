@@ -70,6 +70,41 @@ ssh -N -L 8791:127.0.0.1:8791 <user>@<服务器地址>
 - 想纯静态托管、算力仍在浏览器时，用 `server/workspace_server.py --root ...`
   （`compute=browser`，能力相同但打开 FITS 需先下载到内存）。
 
+#### 部署到「任意服务器」（可移植包，不需要源码仓库）
+
+SSH 连上的服务器通常**没有** SEW_web 源码。把运行所需文件打成一个可移植目录即可：
+
+```bash
+# 本机打包（≈1 MB，不含 Pyodide / 模板 npz）
+python scripts/make_bundle.py --tar
+# → dist/sew-web-server.tar.gz
+
+# 拷到目标服务器（任意路径）
+scp dist/sew-web-server.tar.gz user@server:/data/
+ssh user@server 'cd /data && tar xzf sew-web-server.tar.gz && \
+    pip install ppxf ppxf-sew powerbin capfit flask astropy numpy scipy matplotlib plotly'
+ssh user@server 'cd /data/sew-web-server && \
+    python run.py --root /data/sew-ws --port 8765 --allow-root /data --allow-root $HOME'
+```
+
+- 程序目录与**工作区完全分离**：`--root` 下才有 `templates/ results/ data/`，
+  程序目录只读即可（除 `data/uploads`）。
+- 谱线表、示例谱已随包带（`data/line_use.dat`、`webapp/data/samples/`），
+  不再依赖任何机器的绝对路径。
+- 模板库直接用服务器上装的 `ppxf_sew` 自带模板；「可下载模板」列表会自动
+  隐藏服务器已有的项。
+- 需要浏览器算力时才加 `--with-vendor`（带 60 MB Pyodide 运行时）。
+
+#### 隔离环境自测（模拟“ssh 到一台陌生服务器”）
+
+```bash
+bash scripts/sim_remote.sh 8799        # 自动打包 + 解到 /tmp/sew-remote-sim + 启动
+```
+
+它会建三个互不干扰的目录：`opt/sew-web-server`（程序）、`home`（独立 HOME）、
+`work`（工作区），可用 `SEW_SIM_DIR` / `PYTHON` 覆盖。验证点：页面能加载、
+`compute=server`、浏览服务器目录、直接打开远端 FITS、拟合结果写进 `work/results/`。
+
 ### 方式 B：Cloudflare Tunnel（免费、临时公网域名）
 
 在跑服务的机器上：

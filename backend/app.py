@@ -301,8 +301,9 @@ def health():
 @app.route("/api/samples")
 def samples():
     cands = [
+        os.path.join(DATA_DIR, "samples", "spectrum.fit"),
+        os.path.join(WEBAPP_DIR, "data", "samples", "spectrum.fit"),
         "/home/jflu/DGIS/data/ESO154-G023_DATACUBE.fits",
-        "/home/jflu/DGIS/data/IC5256_DATACUBE.fits",
         "/home/jflu/CCC/ssy_muse/spaxel_1-604053_y63_x27.fits",
     ]
     return jsonify(ok=True, samples=[p for p in cands if os.path.isfile(p)])
@@ -310,23 +311,39 @@ def samples():
 
 # ---------------------------------------------------------------------------
 # 谱线表（line_use.dat + ppxf_sew 拟合发射线）
+#   路径按顺序探测：SEW_LINE_TABLE → data/ → webapp/data/ → 本机旧路径
 # ---------------------------------------------------------------------------
 _LINE_CACHE = {"key": None, "data": None}
-LINE_TABLE = os.environ.get("SEW_LINE_TABLE", "/home/jflu/DGIS/line_use.dat")
+
+
+def _line_table_candidates():
+    env = os.environ.get("SEW_LINE_TABLE") or ""
+    return [p for p in (env,
+                        os.path.join(DATA_DIR, "line_use.dat"),
+                        os.path.join(WEBAPP_DIR, "data", "line_use.dat"),
+                        "/home/jflu/DGIS/line_use.dat") if p]
+
+
+def _line_table() -> str:
+    for p in _line_table_candidates():
+        if os.path.isfile(p):
+            return p
+    return _line_table_candidates()[0]
 
 
 def _load_line_table():
     """读取谱线表（真空波长 Å）+ ppxf_sew 缺省拟合发射线。结果缓存。"""
+    line_table = _line_table()
     try:
-        st = os.stat(LINE_TABLE)
-        key = (LINE_TABLE, st.st_mtime, st.st_size)
+        st = os.stat(line_table)
+        key = (line_table, st.st_mtime, st.st_size)
     except OSError:
-        key = (LINE_TABLE, None, None)
+        key = (line_table, None, None)
     if _LINE_CACHE["key"] == key and _LINE_CACHE["data"] is not None:
         return _LINE_CACHE["data"]
     rows = []
-    if os.path.isfile(LINE_TABLE):
-        with open(LINE_TABLE, encoding="utf-8") as f:
+    if os.path.isfile(line_table):
+        with open(line_table, encoding="utf-8") as f:
             next(f, None)                     # 跳过表头
             for ln in f:
                 p = ln.rstrip("\n").split("\t")
@@ -354,7 +371,7 @@ def _load_line_table():
                 fit.append(dict(lam=float(ww), name=str(nm)))
     except Exception:
         pass
-    data = dict(path=LINE_TABLE, lines=rows, fit_em=fit)
+    data = dict(path=line_table, lines=rows, fit_em=fit)
     _LINE_CACHE.update(key=key, data=data)
     return data
 
