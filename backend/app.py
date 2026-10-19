@@ -699,26 +699,49 @@ def template_list():
         return _err(e)
 
 
+_TPL_PROG = {}      # 模板文件名 -> {done, total, ts, state}
+
+
+@app.route("/api/templates/progress")
+def template_progress():
+    fn = request.args.get("file", "")
+    j = _TPL_PROG.get(os.path.basename(fn)) or {}
+    return jsonify(ok=True, file=fn, **j)
+
+
 @app.route("/api/templates/download", methods=["POST"])
 def template_download():
     body = request.get_json(force=True, silent=True) or {}
     name = body.get("name") or "template"
     url = body.get("url")
     file = body.get("file")
+    if not wsmod.Cfg.root:
+        return _err("请先在工作区设置里选择目录", 400)
+    fn = os.path.basename(str(file or (url or "").split("?")[0] or name))
+    if not fn.lower().endswith(".npz"):
+        fn = f"spectra_{name}_9.0.npz"
+    prog = {"done": 0, "total": 0, "ts": time.time(), "state": "running"}
+    _TPL_PROG[fn] = prog
+
+    def _cb(done, total):
+        prog.update(done=int(done), total=int(total or 0), ts=time.time())
+
     try:
         # 1) 优先用 SEW_web 自带的可下载模板（webapp/templates/*.npz）
         if file or (url and not str(url).lower().startswith(("http://", "https://"))):
-            fn = os.path.basename(str(file or url))
             src = os.path.join(WEBAPP_DIR, "templates", fn)
             if not os.path.isfile(src):
-                return _err(f"自带模板不存在: {fn}（检查 webapp/templates/）", 404)
+                raise FileNotFoundError(f"自带模板不存在: {fn}（检查 webapp/templates/）")
             dst = os.path.join(templates.tpl_local(), fn)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copyfile(src, dst)
-            return jsonify(ok=True, path=dst, name=name)
-        p = templates.download_template(name, url)
+            p = dst
+        else:
+            p = templates.download_template(name, url, progress=_cb)
+        prog.update(state="done", ts=time.time())
         return jsonify(ok=True, path=p, name=name)
     except Exception as e:
+        prog.update(state="error", ts=time.time())
         return _err(f"下载失败: {e}")
 
 
@@ -727,6 +750,8 @@ def template_upload():
     f = request.files.get("file")
     if f is None:
         return _err("没有上传模板文件")
+    if not wsmod.Cfg.root:
+        return _err("请先在工作区设置里选择目录", 400)
     name = request.form.get("name") or None
     try:
         p = templates.save_uploaded_template(f, name=name)

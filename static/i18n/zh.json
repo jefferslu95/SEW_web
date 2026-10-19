@@ -378,5 +378,10 @@
   "set.serverAt": "本页面服务器：{url}",
   "ws.unset": "工作区：未设置",
   "ws.unsetShort": "未设置",
-  "ws.unsetHint": "尚未设置工作区，请点左上角 SEWweb 图标选择目录。"
+  "ws.unsetHint": "尚未设置工作区，请点左上角 SEWweb 图标选择目录。",
+  "ws.dl.start": "正在下载 {name}",
+  "ws.dl.saving": "正在保存 {name}",
+  "ws.dl.server": "服务器正在下载 {name}",
+  "ws.dl.stall": "下载长时间没有数据，已自动中止（可稍后重试）",
+  "ws.dl.timeout": "下载超时，已自动中止"
 }

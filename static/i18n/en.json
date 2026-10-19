@@ -378,5 +378,10 @@
   "set.serverAt": "Served by: {url}",
   "ws.unset": "Workspace: not set",
   "ws.unsetShort": "not set",
-  "ws.unsetHint": "Workspace is not set yet. Click the SEWweb logo to choose a folder."
+  "ws.unsetHint": "Workspace is not set yet. Click the SEWweb logo to choose a folder.",
+  "ws.dl.start": "Downloading {name}",
+  "ws.dl.saving": "Saving {name}",
+  "ws.dl.server": "Server is downloading {name}",
+  "ws.dl.stall": "Download stalled (no data), aborted automatically",
+  "ws.dl.timeout": "Download timed out, aborted"
 }

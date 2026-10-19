@@ -492,16 +492,142 @@
   /* ================= 模板下载 ================= */
   const MANIFEST = 'templates/manifest.json';
 
-  async function downloadTemplate(name, url) {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`HTTP ${r.status} · ${url}`);
-    const buf = new Uint8Array(await r.arrayBuffer());
-    const fn = (String(name || '').trim() || url.split('/').pop() || 'template')
-      + (/\.npz$/i.test(name || url) ? '' : '.npz');
-    const rec = await addFile(KIND_TPL, /\.npz$/i.test(fn) ? fn : fn + '.npz', buf);
-    renderWorkspace();
-    return rec;
+  /* ---------------- 模板下载：状态条 + 无数据超时 ---------------- */
+  const DL_STALL_MS = 30000;        // 30 s 无新数据 → 判定卡住
+  const DL_TOTAL_MS = 20 * 60 * 1000;
+
+  function dlBox() { return $('wsDlBox'); }
+  function dlShow(msg) {
+    const box = dlBox();
+    if (!box) return;
+    box.classList.remove('hidden');
+    const m = $('wsDlMsg');
+    if (m) m.textContent = msg;
+    const bar = $('wsDlBar');
+    if (bar) bar.style.width = '0%';
   }
+  function dlSet(loaded, total, msg) {
+    const bar = $('wsDlBar');
+    const m = $('wsDlMsg');
+    if (bar) {
+      bar.style.width = total > 0
+        ? Math.max(2, Math.min(100, (loaded / total) * 100)) + '%'
+        : '35%';                     // 未知长度：给个静态宽度
+    }
+    if (m) {
+      const pct = total > 0 ? ` (${((loaded / total) * 100).toFixed(0)}%)` : '';
+      m.textContent = (msg || '') + (loaded
+        ? ` ${fmtSize(loaded)}${total > 0 ? ' / ' + fmtSize(total) : ''}${pct}`
+        : '');
+    }
+  }
+  function dlDone() {
+    const box = dlBox();
+    if (box) box.classList.add('hidden');
+  }
+
+  /* 浏览器端下载：流式读取，实时进度；无数据 30 s 自动中止 */
+  async function downloadTemplate(name, url, opts) {
+    opts = opts || {};
+    const ctl = new AbortController();
+    const start = Date.now();
+    let last = start;
+    const timer = setInterval(() => {
+      if (Date.now() - last > DL_STALL_MS) ctl.abort();
+    }, 1500);
+    dlShow(t('ws.dl.start', { name: name || '' }));
+    try {
+      const r = await fetch(url, { signal: ctl.signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status} · ${url}`);
+      const total = Number(r.headers.get('Content-Length') || 0);
+      let bytes = null;
+      if (r.body && r.body.getReader) {
+        const reader = r.body.getReader();
+        const chunks = [];
+        let loaded = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          last = Date.now();
+          chunks.push(value);
+          loaded += value.length;
+          dlSet(loaded, total, t('ws.dl.start', { name: name || '' }));
+          if (Date.now() - start > DL_TOTAL_MS) {
+            ctl.abort();
+            throw new Error(t('ws.dl.timeout'));
+          }
+        }
+        bytes = new Uint8Array(loaded);
+        let off = 0;
+        chunks.forEach((c) => { bytes.set(c, off); off += c.length; });
+      } else {
+        bytes = new Uint8Array(await r.arrayBuffer());
+      }
+      dlSet(bytes.length, bytes.length, t('ws.dl.saving', { name: name || '' }));
+      const fn = (String(name || '').trim() || url.split('/').pop() || 'template')
+        + (/\.npz$/i.test(name || url) ? '' : '.npz');
+      const rec = await addFile(KIND_TPL, /\.npz$/i.test(fn) ? fn : fn + '.npz', bytes);
+      renderWorkspace();
+      return rec;
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error(t('ws.dl.stall'));
+      throw e;
+    } finally {
+      clearInterval(timer);
+      dlDone();
+    }
+  }
+
+  /* 服务器端下载：后端下载到工作区，前端轮询进度 */
+  async function downloadOnServer(e) {
+    const body = e.url ? { name: e.name, url: e.url }
+      : { name: e.name, file: e.file };
+    // 后端按文件名记录进度：优先用清单里的 file，否则从 URL 里取
+    const file = e.file || String(e.url || '').split('?')[0].split('/').pop() || '';
+    const start = Date.now();
+    let finished = false;
+    let err = null;
+    const job = fetch(apiUrl('api/templates/download'), {
+      method: 'POST',
+      headers: (window.SEWWS && window.SEWWS._hdr)
+        ? window.SEWWS._hdr({ 'Content-Type': 'application/json' }) : {},
+      body: JSON.stringify(body),
+    }).then(async (r) => {
+      const j = await r.json().catch(() => ({}));
+      finished = true;
+      if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+      return j;
+    }).catch((e2) => { finished = true; err = e2; return null; });
+
+    let lastProg = Date.now();
+    let lastDone = -1;
+    dlShow(t('ws.dl.server', { name: e.name }));
+    while (!finished) {
+      await new Promise((res) => setTimeout(res, 1000));
+      try {
+        const r = await fetch(apiUrl('api/templates/progress?' +
+          new URLSearchParams({ file })), { cache: 'no-store' });
+        const j = await r.json();
+        if (j && typeof j.done === 'number') {
+          if (j.done !== lastDone) { lastDone = j.done; lastProg = Date.now(); }
+          dlSet(j.done || 0, j.total || 0, t('ws.dl.server', { name: e.name }));
+        }
+      } catch (e2) { /* 忽略单次查询失败 */ }
+      if (Date.now() - lastProg > DL_STALL_MS * 3) {
+        dlDone();
+        throw new Error(t('ws.dl.stall'));
+      }
+      if (Date.now() - start > DL_TOTAL_MS) {
+        dlDone();
+        throw new Error(t('ws.dl.timeout'));
+      }
+    }
+    dlDone();
+    await job;
+    if (err) throw err;
+    return true;
+  }
+
 
   /* ================= api shim ================= */
   async function serverPassthru(url, opts) {
@@ -708,9 +834,7 @@
               // 默认从 ppxf_data（micappe/ppxf_data）下载；无 url 时用站点内副本
               const srcUrl = e.url || (e.file ? ('templates/' + e.file) : '');
               if (computeOnServer()) {
-                const body = e.url ? { name: e.name, url: e.url }
-                  : { name: e.name, file: e.file };
-                await serverRpc('POST', '/api/templates/download', {}, body);
+                await downloadOnServer(e);
               } else {
                 const rec = await downloadTemplate(e.name, srcUrl);
                 if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
@@ -777,8 +901,7 @@
         dl.disabled = true;
         try {
           if (computeOnServer()) {
-            await serverRpc('POST', '/api/templates/download', {},
-                             { name: name || 'template', url });
+            await downloadOnServer({ name: name || 'template', url });
           } else {
             const rec = await downloadTemplate(name, url);
             if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));

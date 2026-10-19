@@ -271,8 +271,7 @@ summary:hover{color:var(--accent)}
   color:var(--muted);font-family:ui-monospace,monospace;margin-top:3px}
 
 /* ---------------- progress ---------------- */
-.progress{height:8px;background:#e8ecf4;border-radius:6px;overflow:hidden;margin-top:8px}
-.progress-bar{height:100%;width:0;background:linear-gradient(90deg,#4f8cff,#0d9488);
+.progress{height:8px;background:#e8ecf4;border-radius:6px;overflow:hidden;margin-top:8px}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,#4f8cff,#0d9488);
   transition:width .25s ease}
 #fitMsg{margin-top:4px}
 
@@ -385,3 +384,7 @@ summary:hover{color:var(--accent)}
 #wsDirPicker{z-index:130}
 #wsDirPicker .modal-box{max-height:74vh}
 #wsDirPicker .browselist{max-height:44vh}
+
+/* 模板下载状态条 */
+#wsDlBox{margin:6px 0 2px}
+#wsDlBox .progress{height:6px}

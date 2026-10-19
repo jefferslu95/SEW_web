@@ -166,8 +166,12 @@ def load_registry():
         return {}
 
 
-def download_template(name: str, url: str, timeout=600, progress=None):
-    """下载模板到工作区 templates/（默认源见 webapp/templates/manifest.json）。"""
+def download_template(name: str, url: str, timeout=60, progress=None):
+    """下载模板到工作区 templates/（默认源见 webapp/templates/manifest.json）。
+
+    ``timeout`` 是「单次读取超时」：只要还有数据在流动就不会触发；
+    这里用 ``read1`` 小步读取，保证进度回调能及时更新（大文件/慢链路也适用）。
+    """
     if not url or not str(url).lower().startswith(("http://", "https://")):
         raise ValueError("请提供 http(s) 模板下载地址")
     local = tpl_local()
@@ -184,7 +188,7 @@ def download_template(name: str, url: str, timeout=600, progress=None):
             total = int(r.headers.get("Content-Length") or 0)
             done = 0
             while True:
-                chunk = r.read(1024 * 1024)
+                chunk = r.read1(1 << 16)
                 if not chunk:
                     break
                 f.write(chunk)
