@@ -29,9 +29,17 @@
     server: null,        // {root, writable, compute, ...} 服务器工作区
     backend: 'browser',  // 'server' | 'local' | 'browser'
     compute: 'browser',  // 'server' = 服务器算力（不启动 Pyodide）
+    apiBase: '',         // '' = 页面所在服务器；或 'http://127.0.0.1:8765'（SSH 算力服务器）
+    remoteError: '',     // 配置了算力服务器但连不上时的错误
     _token: '',
     ready: null,         // Promise
     autoSaveVendor: true,
+
+    /* API 地址：页面可能来自网页服务器（GitHub Pages），算力在另一台 SSH 服务器 */
+    apiUrl(p) {
+      const s = String(p || '').replace(/^\/+/, '');
+      return this.apiBase ? this.apiBase.replace(/\/+$/, '') + '/' + s : s;
+    },
 
     /* 是否走服务器算力（服务器工作区 + 后端声明 compute=server） */
     serverCompute() {
@@ -44,14 +52,16 @@
     },
 
     /* ---------------- 服务器工作区 ---------------- */
-    async detectServer() {
+    async detectServer(base) {
+      const url = (base === undefined ? this.apiUrl('api/ws/info')
+        : (String(base || '').replace(/\/+$/, '') + '/api/ws/info'));
       try {
-        let r = await fetch('api/ws/info', { cache: 'no-store', headers: this._hdr() });
+        let r = await fetch(url, { cache: 'no-store', headers: this._hdr() });
         if (r.status === 401) {
           const tok = localStorage.getItem('sew.ws.token') || '';
           if (tok) {
             this._token = tok;
-            r = await fetch('api/ws/info', { cache: 'no-store', headers: this._hdr() });
+            r = await fetch(url, { cache: 'no-store', headers: this._hdr() });
           }
           if (r.status === 401) { this._needsToken = true; return null; }
         }
@@ -60,7 +70,10 @@
         if (!j.ok) return null;
         this.server = j;
         return j;
-      } catch (e) { return null; }
+      } catch (e) {
+        this.remoteError = String((e && e.message) || e);
+        return null;
+      }
     },
 
     useServer(info) {
@@ -79,7 +92,7 @@
 
     /* 切换服务器工作区目录（服务端重启后仍有效） */
     async setServerRoot(path) {
-      const r = await fetch('api/ws/root', {
+      const r = await fetch(this.apiUrl('api/ws/root'), {
         method: 'POST',
         headers: this._hdr({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ root: path }),
@@ -94,9 +107,40 @@
       return this.server;
     },
 
+    /* 连接 SSH 算力服务器（页面在网页服务器上时使用） */
+    async setRemote(url) {
+      const base = String(url || '').trim().replace(/\/+$/, '');
+      if (!base) throw new Error('需要填写算力服务器地址');
+      this.apiBase = base;
+      this.remoteError = '';
+      const info = await this.detectServer();
+      if (!info) {
+        const err = this.remoteError || T('set.remoteFail');
+        this.apiBase = '';
+        throw new Error(err);
+      }
+      this.useServer(info);
+      await this._metaPut('remoteUrl', base);
+      await this.setPref('server');
+      return this.server;
+    },
+
+    /* 断开算力服务器，回到本机（浏览器） */
+    async clearRemote() {
+      this.apiBase = '';
+      this.remoteError = '';
+      try { await this._metaPut('remoteUrl', ''); } catch (e) { /* ignore */ }
+      this.backend = 'browser';
+      this.compute = 'browser';
+      this.dir = null;
+      this.dirName = '';
+      this.server = null;
+      await this.setPref('browser');
+    },
+
     async _srvPut(dir, name, blob) {
       const q = new URLSearchParams({ dir, name });
-      const r = await fetch('api/ws/put?' + q, {
+      const r = await fetch(this.apiUrl('api/ws/put?' + q), {
         method: 'POST', headers: this._hdr({ 'Content-Type': 'application/octet-stream' }),
         body: blob,
       });
@@ -105,19 +149,19 @@
       return true;
     },
     async _srvList(dir) {
-      const r = await fetch('api/ws/list?' + new URLSearchParams({ dir }),
+      const r = await fetch(this.apiUrl('api/ws/list?' + new URLSearchParams({ dir })),
         { cache: 'no-store', headers: this._hdr() });
       const j = await r.json();
       return (j.files || []).map((f) => f.name);
     },
     async _srvGet(dir, name) {
-      const r = await fetch('api/ws/get?' + new URLSearchParams({ dir, name }),
+      const r = await fetch(this.apiUrl('api/ws/get?' + new URLSearchParams({ dir, name })),
         { headers: this._hdr() });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.blob();
     },
     async _srvDel(dir, name) {
-      const r = await fetch('api/ws/delete?' + new URLSearchParams({ dir, name }),
+      const r = await fetch(this.apiUrl('api/ws/delete?' + new URLSearchParams({ dir, name })),
         { method: 'DELETE', headers: this._hdr() });
       return r.ok;
     },
@@ -354,14 +398,30 @@
         ]);
       } catch (e) { console.warn('SW 注册失败', e); }
     }
-    // 1) 页面由「算力服务器」提供（同源有 /api/ws/*）：工作区就是这台服务器的目录。
-    //    这里必须忽略浏览器本地偏好：在 SSH 服务器上的网页里不该出现本机目录。
+    // 1) 已配置的算力服务器（页面可能来自网页服务器，算力在另一台机器）
+    let remote = '';
+    try { remote = (await SEWWS._metaGet('remoteUrl')) || ''; } catch (e) { /* ignore */ }
+    if (remote) {
+      SEWWS.apiBase = String(remote).replace(/\/+$/, '');
+      SEWWS.remoteError = '';
+      const info = await SEWWS.detectServer();
+      if (info && info.writable) {
+        SEWWS.useServer(info);
+        return { restored: true, server: true, remote: true };
+      }
+      // 配置了但连不上：不静默回退到本地（否则算力/工作区跑到本机）
+      SEWWS.remoteError = SEWWS.remoteError || T('set.remoteFail');
+      SEWWS.backend = 'browser';
+      SEWWS.apiBase = '';
+      return { restored: true, server: false, remoteDown: true };
+    }
+    // 2) 页面由算力服务器直接提供（同源有 /api/ws/*）：工作区就是这台服务器的目录
     const srv = await SEWWS.detectServer();
     if (srv && srv.writable) {
       SEWWS.useServer(srv);
       return { restored: true, server: true };
     }
-    // 2) 上次选过的本地目录（未授权则等用户点按钮）
+    // 3) 上次选过的本地目录（未授权则等用户点按钮）
     let restored = false;
     try { restored = await SEWWS.restoreDir(true); } catch (e) { /* ignore */ }
     if (restored) {
@@ -554,8 +614,9 @@
 
   /* ---------------- 服务器目录浏览（选工作区用） ---------------- */
   async function browseDirs(path) {
-    const r = await fetch('api/ws/browse?' +
-      new URLSearchParams({ path: path || '' }), { cache: 'no-store' });
+    const r = await fetch(SEWWS.apiUrl('api/ws/browse?' +
+      new URLSearchParams({ path: path || '' })),
+      { cache: 'no-store', headers: SEWWS._hdr() });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
     return j;
@@ -634,7 +695,7 @@
     render(start || '');
   }
 
-  function openSettings() {
+  async function openSettings() {
     srvWhenOpened = SEWWS.serverCompute();
     const old = $('wsSettings');
     if (old) old.remove();
@@ -654,6 +715,10 @@
             <button id="setSrvBrowse" class="ghost" data-i18n="set.browse"></button>
             <button id="setSrvApply" class="primary" data-i18n="set.apply"></button>
           </div>
+          <div id="setSrvWhere" class="small muted" style="margin-top:4px"></div>
+          <div class="row" style="margin-top:6px">
+            <button id="setSrvDisconnect" class="ghost small" data-i18n="set.disconnect"></button>
+          </div>
         </div>`
       : `
         <div class="set-sec">
@@ -664,6 +729,16 @@
             <button id="setOpfs" class="ghost" data-i18n="wiz.opfs"></button>
             <button id="setBrowser" class="ghost" data-i18n="wiz.skip"></button>
           </div>
+        </div>
+        <div class="set-sec">
+          <div class="set-h" data-i18n="set.remote"></div>
+          <div class="small muted" data-i18n="set.remoteHint"></div>
+          <div class="row" style="margin-top:6px">
+            <input id="setRemoteUrl" type="text" spellcheck="false"
+                   placeholder="http://127.0.0.1:8765" style="flex:1;min-width:0"/>
+            <button id="setRemoteGo" class="primary" data-i18n="set.connect"></button>
+          </div>
+          <div id="setRemoteMsg" class="small" style="color:#b45309;margin-top:4px"></div>
         </div>`;
     el.innerHTML = `
       <div class="wizard-box">
@@ -692,6 +767,10 @@
       const pathInp = $('setSrvPath');
       if (pathInp) pathInp.value = (SEWWS.dirName)
         || (SEWWS.server && SEWWS.server.root) || '';
+      const where = $('setSrvWhere');
+      if (where) {
+        where.textContent = T('set.serverAt', { url: SEWWS.apiBase || location.origin });
+      }
 
       $('setSrvBrowse').onclick = () => {
         const start = ($('setSrvPath').value || '').trim();
@@ -714,7 +793,40 @@
           if (window.toast) window.toast(T('set.badRoot', { msg: e.message || e }), 'err');
         } finally { btn.disabled = false; }
       };
+
+      const dis = $('setSrvDisconnect');
+      if (dis) {
+        dis.onclick = async () => {
+          await SEWWS.clearRemote();
+          close();
+          location.reload();
+        };
+      }
       return;
+    }
+
+    // 浏览器宿主：可选连接 SSH 算力服务器
+    const rmsg = $('setRemoteMsg');
+    const rurl = $('setRemoteUrl');
+    if (rurl) {
+      try { rurl.value = (await SEWWS._metaGet('remoteUrl')) || ''; }
+      catch (e) { /* ignore */ }
+    }
+    if (rmsg && SEWWS.remoteError) rmsg.textContent = SEWWS.remoteError;
+    if ($('setRemoteGo')) {
+      $('setRemoteGo').onclick = async () => {
+        const u = (($('setRemoteUrl') || {}).value || '').trim();
+        if (!u) return;
+        const btn = $('setRemoteGo');
+        btn.disabled = true;
+        if (rmsg) rmsg.textContent = T('set.connecting');
+        try {
+          await SEWWS.setRemote(u);
+          location.reload();
+        } catch (e) {
+          if (rmsg) rmsg.textContent = String(e.message || e);
+        } finally { btn.disabled = false; }
+      };
     }
     $('setLocal').onclick = async () => {
       try {
@@ -756,6 +868,12 @@
   SEWWS.ready = preInitP.then(async (st) => {
     const restored = !!(st && st.restored);
     const serverMode = !!(st && st.server);
+    const remoteDown = !!(st && st.remoteDown);
+    // 连不上已配置的算力服务器：明确提示，不弹“选本机目录”的引导
+    if (remoteDown) {
+      if (window.toast) window.toast(SEWWS.remoteError || T('set.remoteFail'), 'err');
+      return;
+    }
     // 第一次进入（没有服务器工作区、没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
     let wantMirror = false;
     let skipped = false;

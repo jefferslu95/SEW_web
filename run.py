@@ -29,19 +29,19 @@ def main():
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--root", default=None,
                     help="服务器工作区根目录（默认 ~/sew-workspace）")
-    ap.add_argument("--allow-root", action="append", default=[],
-                    help="允许作为/浏览的工作区目录（可多次），默认 root 与 $HOME")
     ap.add_argument("--token", default=None,
                     help="服务器工作区口令（也可用 SEW_WORKSPACE_TOKEN）")
+    ap.add_argument("--cors", default=None,
+                    help="允许的跨源来源（逗号分隔；默认 * 回显 Origin）")
     args = ap.parse_args()
 
     # 服务器工作区配置必须在导入 app 之前入环境
     if args.root:
         os.environ["SEW_WS_ROOT"] = args.root
-    if args.allow_root:
-        os.environ["SEW_WS_ALLOW"] = os.pathsep.join(args.allow_root)
     if args.token:
         os.environ["SEW_WORKSPACE_TOKEN"] = args.token
+    if args.cors:
+        os.environ["SEW_CORS"] = args.cors
 
     from backend.app import app
     from backend import workspace as wsmod

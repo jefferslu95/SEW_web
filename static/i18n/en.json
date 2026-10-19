@@ -374,5 +374,12 @@
   "hdr.compute.srv": "Compute: server · Workspace: {root}",
   "hdr.compute.loc": "Compute: this browser · Workspace: {root}",
   "collapse.title.ws": "Expand / collapse workspace",
-  "set.staticHint": "This page is a plain static deployment ({origin}) with no server backend, so “Choose folder” opens folders on this computer. To use folders on a server, open the page served by that server (run run.py there)."
+  "set.staticHint": "This page is a plain static deployment ({origin}) with no server backend, so “Choose folder” opens folders on this computer. To use folders on a server, open the page served by that server (run run.py there).",
+  "set.remote": "Connect compute server (SSH)",
+  "set.remoteHint": "When the page is served by a web server and compute runs elsewhere: enter that machine's URL (e.g. http://127.0.0.1:8765 after ssh -L). The workspace then lives on that machine.",
+  "set.connect": "Connect",
+  "set.connecting": "Connecting…",
+  "set.disconnect": "Disconnect compute server",
+  "set.remoteFail": "Cannot reach the compute server",
+  "set.serverAt": "Compute server: {url}"
 }

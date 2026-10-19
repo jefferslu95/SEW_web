@@ -67,24 +67,21 @@ python -m http.server 8790 --directory webapp
 
 ```bash
 # 服务器上
-python run.py --root ~/sew-ws --port 8791 \
-    --allow-root ~ --allow-root /data
+python run.py --root ~/sew-ws --port 8791
 # 本地
 ssh -N -L 8791:127.0.0.1:8791 user@server
 # 打开 http://127.0.0.1:8791/
 ```
 
-- `--root` 初始工作区；`--allow-root`（可多次）限定可切换/可浏览的目录范围，
-  不传时默认 `[--root, $HOME]`；`--token` 可给 `/api/ws/*` 加 `X-SEW-Token` 校验。
+- `--root` 初始工作区；`--token` 可给 `/api/ws/*` 加 `X-SEW-Token` 校验。
 - 模板、FITS、结果都写在服务器的 `<root>/templates|results|data/`；
   模板库（`/api/templates`）也优先读 `<root>/templates`。
 - **可下载模板随 SEW_web 一起分发**（`webapp/templates/*.npz`）：点下载即从包里
   本地拷贝到 `<root>/templates/`，不依赖外网，也不用事先装 ppxf_sew 自带模板。
-- **`浏览` 列的是服务器端目录**（`/api/ws/browse`，限制在 `--allow-root` 内），
-  选中 FITS 后只把**路径**发给后端，不传输文件内容。
+- **`浏览` 列的是服务器端目录**（`/api/ws/browse`）；选中 FITS 后只把**路径**
+  发给后端，不传输文件内容。
 - **切换工作区**：点左上角 **SEWweb 图标** → 「工作区设置」面板 → 填服务器目录（或点
-  **浏览…** 在允许范围内逐级选目录，面板会显示 `--allow-root` 允许范围）→ 应用
-  （POST `/api/ws/root`，会做 `--allow-root` 校验并自动 `mkdir`）。同一面板也能切回
+  **浏览…** 逐级选目录）→ 应用（`POST /api/ws/root`，自动 `mkdir`）。同一面板也能切回
   本地目录 / OPFS / 仅浏览器存储（切回去就用浏览器算力）。
 - 接口：`GET /api/ws/info|browse|file|list|get`，`POST /api/ws/root|put`，`DELETE /api/ws/delete`。
 
@@ -93,11 +90,32 @@ ssh -N -L 8791:127.0.0.1:8791 user@server
 只想托管静态站点、算力仍然留在浏览器时用这个：
 
 ```bash
-python server/workspace_server.py --root ~/sew-ws --port 8790 --allow-root ~
+python server/workspace_server.py --root ~/sew-ws --port 8790
 ```
 
 它对 `/api/ws/*` 提供同样能力，但 `compute=browser`，前端会照常启动 Pyodide，
 打开服务器 FITS 时先流式下载到内存文件系统。
+
+## 网页服务器 + SSH 算力服务器（两个服务器）
+
+页面始终部署在**网页服务器**（GitHub Pages 等）。如果算力/文件在那台 **SSH 服务器**上：
+
+```bash
+# 1) SSH 服务器上（默认已开启 CORS，可用 --cors 收窄）
+python run.py --root ~/sew-ws --port 8765
+# 2) 本地（或 VS Code 端口转发）
+ssh -N -L 8765:127.0.0.1:8765 user@server
+```
+
+然后打开网页服务器上的页面 → 点左上角 **SEWweb 图标** → 「连接算力服务器（SSH）」→
+填 `http://127.0.0.1:8765`（ssh -L 后的地址）→ 连接。
+
+- 连上后：算力 = 那台机器（不启动 Pyodide），工作区 = 那台机器的目录（带目录浏览），
+  页面不会再弹本机目录选择框。
+- 配置保存在页面源的 localStorage，刷新后自动重连；连不上会明确报错（不会静默退回本机）。
+- 「断开算力服务器」即回到纯浏览器模式（Pyodide + 本机工作区）。
+- 跨源需要后端支持 CORS（已内置 `SEW_CORS`，默认回显 Origin）与预检；
+  `https://` 页面访问 `http://127.0.0.1` 依赖浏览器策略，若被拦请用 VS Code 的 https 转发地址。
 
 ## 工作区（首次进入会引导设置）
 

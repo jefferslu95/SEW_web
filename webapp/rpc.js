@@ -168,15 +168,23 @@
     return w.backend === 'server' && !!(w.server && w.server.compute === 'server');
   }
 
+  /* API 地址（页面可能在网页服务器，算力在另一台 SSH 服务器） */
+  function apiUrl(p) {
+    const w = window.SEWWS;
+    return (w && typeof w.apiUrl === 'function') ? w.apiUrl(p) : p;
+  }
+
   /* 直接转发到服务器（Flask），语义与 rpc() 相同（返回已解析的 JSON） */
   async function serverRpc(method, path, query, body) {
-    let url = path;
+    let url = apiUrl(path);
     const qs = new URLSearchParams();
     Object.keys(query || {}).forEach((k) => {
       if (query[k] !== undefined && query[k] !== null) qs.set(k, query[k]);
     });
     if ([...qs.keys()].length) url += (url.includes('?') ? '&' : '?') + qs;
-    const opts = { method, cache: 'no-store', headers: {} };
+    const w = window.SEWWS;
+    const opts = { method, cache: 'no-store',
+                   headers: (w && w._hdr) ? w._hdr() : {} };
     if (method !== 'GET' && method !== 'HEAD') {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body || {});
@@ -444,7 +452,7 @@
     const q = new URLSearchParams();
     if (path) q.set('path', path);
     const ws = window.SEWWS;
-    const r = await fetch('api/ws/browse?' + q.toString(),
+    const r = await fetch(apiUrl('api/ws/browse?' + q.toString()),
       { cache: 'no-store', headers: (ws && ws._hdr()) || {} });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
@@ -469,7 +477,7 @@
     if (String(p).startsWith('/sew/')) return p;
     if (memPathCache.has(p)) return memPathCache.get(p);
     const ws = window.SEWWS;
-    const r = await fetch('api/ws/file?' + new URLSearchParams({ path: p }),
+    const r = await fetch(apiUrl('api/ws/file?' + new URLSearchParams({ path: p })),
       { headers: (ws && ws._hdr()) || {} });
     if (!r.ok) throw new Error(`无法读取服务器文件（HTTP ${r.status}）`);
     const buf = new Uint8Array(await r.arrayBuffer());
@@ -497,7 +505,8 @@
 
   /* ================= api shim ================= */
   async function serverPassthru(url, opts) {
-    const r = await fetch(url, Object.assign({ cache: 'no-store' }, opts || {}));
+    const abs = apiUrl(url);
+    const r = await fetch(abs, Object.assign({ cache: 'no-store' }, opts || {}));
     let j = null;
     try { j = await r.json(); } catch (e) { j = null; }
     if (j === null) throw new Error(`HTTP ${r.status}`);
@@ -583,7 +592,7 @@
   async function serverList(sub) {
     const ws = window.SEWWS;
     try {
-      const r = await fetch('api/ws/list?' + new URLSearchParams({ dir: sub }),
+      const r = await fetch(apiUrl('api/ws/list?' + new URLSearchParams({ dir: sub })),
         { cache: 'no-store', headers: (ws && ws._hdr()) || {} });
       const j = await r.json();
       return (j && j.files) || [];

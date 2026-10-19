@@ -56,18 +56,17 @@ SSH 转发场景推荐：**界面在浏览器，算力与文件都在服务器**
 
 ```bash
 # 服务器上
-python run.py --root ~/sew-ws --port 8791 --allow-root ~ --allow-root /data
+python run.py --root ~/sew-ws --port 8791
 # 本地
 ssh -N -L 8791:127.0.0.1:8791 <user>@<服务器地址>
 ```
 
-- `--allow-root`（可重复）限定可浏览/可切换的目录白名单，默认 `[--root, $HOME]`；
-  试图切到白名单外会返回 403（页面上会提示「不允许的目录」）。
+- `--root` 指定工作区（模板、FITS、结果都在它的 `templates|results|data/` 下）；
+  工作区可以随时在页面上改（不限制目录，本工具就是单用户自己用）。
 - 模板、FITS、拟合结果都写在服务器的 `<root>/templates|results|data/`，
   模板库也优先读 `<root>/templates`。
 - 点左上角 **SEWweb 图标**打开「工作区设置」，可随时改服务器工作区路径
-  （`POST /api/ws/root`）；面板里有 **「浏览…」目录树**：可在允许范围内逐级选目录、
-  点选快捷根，并显示当前 `--allow-root` 允许范围（越界时会提示完整范围）。
+  （`POST /api/ws/root`）；面板里有 **「浏览…」目录树**，可逐级选目录。
 - 想纯静态托管、算力仍在浏览器时，用 `server/workspace_server.py --root ...`
   （`compute=browser`，能力相同但打开 FITS 需先下载到内存）。
 
@@ -85,7 +84,7 @@ scp dist/sew-web-server.tar.gz user@server:/data/
 ssh user@server 'cd /data && tar xzf sew-web-server.tar.gz && \
     pip install ppxf ppxf-sew powerbin capfit flask astropy numpy scipy matplotlib plotly'
 ssh user@server 'cd /data/sew-web-server && \
-    python run.py --root /data/sew-ws --port 8765 --allow-root /data --allow-root $HOME'
+    python run.py --root /data/sew-ws --port 8765'
 ```
 
 - 程序目录与**工作区完全分离**：`--root` 下才有 `templates/ results/ data/`，
@@ -106,6 +105,26 @@ bash scripts/sim_remote.sh 8799        # 自动打包 + 解到 /tmp/sew-remote-s
 它会建三个互不干扰的目录：`opt/sew-web-server`（程序）、`home`（独立 HOME）、
 `work`（工作区），可用 `SEW_SIM_DIR` / `PYTHON` 覆盖。验证点：页面能加载、
 `compute=server`、浏览服务器目录、直接打开远端 FITS、拟合结果写进 `work/results/`。
+
+#### 变体：网页服务器部署页面 + SSH 服务器提供算力（两个服务器）
+
+页面在 GitHub Pages（或任意静态托管），算力与工作区在那台 SSH 服务器：
+
+```bash
+# SSH 服务器
+python run.py --root ~/sew-ws --port 8765      # 默认允许跨源（SEW_CORS=*）
+# 本地
+ssh -N -L 8765:127.0.0.1:8765 <user>@<server>
+```
+
+打开网页服务器上的页面 → 点左上角 **SEWweb 图标** → 「连接算力服务器（SSH）」→
+填 `http://127.0.0.1:8765` → 连接。连上后算力与工作区都在该服务器，
+设置面板只提供服务器目录（不会弹本机目录选择）。
+
+- `--cors "https://xxx.github.io,http://localhost:8080"` 可收窄允许的页面来源。
+- `--token 口令` 开启后，页面连接时需提供同一个口令（`X-SEW-Token`）。
+- `https://` 页面访问 `http://127.0.0.1` 可能受浏览器混合内容/私有网络策略限制，
+  必要时用 VS Code 提供的 https 端口转发地址（或 Cloudflare Tunnel 给后端一个 https 域名）。
 
 ### 方式 B：Cloudflare Tunnel（免费、临时公网域名）
 

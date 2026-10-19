@@ -39,10 +39,8 @@ def _page_dir() -> str:
         return WEBAPP_DIR
     return STATIC_DIR
 
-# 服务器工作区：默认 ~/sew-workspace；可用 SEW_WS_ROOT / SEW_WS_ALLOW 覆盖
+# 服务器工作区：默认 ~/sew-workspace；可用 SEW_WS_ROOT 覆盖
 wsmod.init(root=os.environ.get("SEW_WS_ROOT") or None,
-           allow_roots=[p for p in (os.environ.get("SEW_WS_ALLOW") or "")
-                        .split(os.pathsep) if p.strip()] or None,
            token=os.environ.get("SEW_WORKSPACE_TOKEN") or "",
            compute="server")
 # 模板库优先读工作区 <root>/templates（随 /api/ws/root 切换动态生效）
@@ -87,14 +85,14 @@ def _in_roots(path: str) -> bool:
 
 @app.before_request
 def _check_auth():
-    # 服务器工作区接口：可选口令（X-SEW-Token）
-    if request.path.startswith("/api/ws/"):
-        tk = wsmod.Cfg.token
-        if tk:
-            got = request.headers.get("X-SEW-Token") or request.args.get("token") or ""
-            if got != tk:
-                return jsonify(dict(ok=False, error="令牌无效")), 401
+    # 预检请求不鉴权（否则浏览器拿不到 CORS 头）
+    if request.method == "OPTIONS":
         return None
+    # 工作区/API 口令（可选）
+    if request.path.startswith("/api/") and wsmod.Cfg.token:
+        got = request.headers.get("X-SEW-Token") or request.args.get("token") or ""
+        if got != wsmod.Cfg.token:
+            return jsonify(dict(ok=False, error="令牌无效")), 401
     if _AUTH_PAIR is None:
         return None
     a = request.authorization
@@ -102,6 +100,47 @@ def _check_auth():
         return Response("authentication required", 401,
                         {"WWW-Authenticate": 'Basic realm="SEW web"'})
     return None
+
+
+# ---------------------------------------------------------------------------
+# 跨源访问：页面可能部署在别的网页服务器上（GitHub Pages 等），
+# 浏览器在这里打开的页面需要访问本服务器的 /api/*。
+#   SEW_CORS="*"                      -> 回显请求的 Origin（默认）
+#   SEW_CORS="https://a.com,http://localhost:8080"
+# ---------------------------------------------------------------------------
+_CORS = os.environ.get("SEW_CORS", "*")
+
+
+def _cors_origin(origin: str) -> str:
+    if not origin:
+        return ""
+    if _CORS.strip() == "*":
+        return origin
+    allowed = [x.strip() for x in _CORS.split(",") if x.strip()]
+    return origin if origin in allowed else ""
+
+
+@app.after_request
+def _add_cors(resp):
+    origin = request.headers.get("Origin") or ""
+    allow = _cors_origin(origin)
+    if allow:
+        resp.headers["Access-Control-Allow-Origin"] = allow
+        resp.headers["Vary"] = "Origin"
+        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,DELETE,OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = \
+            "Content-Type, X-SEW-Token, Authorization"
+        resp.headers["Access-Control-Expose-Headers"] = "Content-Length"
+        # Chrome 私有网络访问（公网页面 -> 127.0.0.1 / 内网地址）
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    return resp
+
+
+@app.route("/api/<path:_any>", methods=["OPTIONS"])
+@app.route("/api/", methods=["OPTIONS"])
+def _api_preflight(_any=""):
+    resp = Response("", 204)
+    return resp
 
 
 # ---------------------------------------------------------------------------
