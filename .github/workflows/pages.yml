@@ -45,9 +45,8 @@ jobs:
       - name: Fetch Pyodide runtime
         run: python scripts/fetch_pyodide.py
 
-      - name: Check downloadable templates
-        run: |
-          python scripts/sync_templates.py || true
+      - name: Fetch downloadable templates (micappe/ppxf_data)
+        run: python scripts/sync_templates.py --download || true
 
       - name: Disable Jekyll
         run: touch webapp/.nojekyll

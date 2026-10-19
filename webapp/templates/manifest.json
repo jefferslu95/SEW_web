@@ -1,22 +1,33 @@
 {
+  "source": "https://github.com/micappe/ppxf_data",
   "templates": [
     {
       "name": "emiles",
       "label": "EMILES (25×6)",
       "file": "spectra_emiles_9.0.npz",
-      "size_mb": 13
+      "size_mb": 13,
+      "url": "https://raw.githubusercontent.com/micappe/ppxf_data/main/spectra_emiles_9.0.npz"
     },
     {
       "name": "fsps",
       "label": "FSPS (43×9)",
       "file": "spectra_fsps_9.0.npz",
-      "size_mb": 15
+      "size_mb": 15,
+      "url": "https://raw.githubusercontent.com/micappe/ppxf_data/main/spectra_fsps_9.0.npz"
     },
     {
       "name": "galaxev",
       "label": "Galaxev (43×5)",
       "file": "spectra_galaxev_9.0.npz",
-      "size_mb": 20
+      "size_mb": 20,
+      "url": "https://raw.githubusercontent.com/micappe/ppxf_data/main/spectra_galaxev_9.0.npz"
+    },
+    {
+      "name": "xsl",
+      "label": "XSL (26×8)",
+      "file": "spectra_xsl_9.0.npz",
+      "size_mb": 94,
+      "url": "https://raw.githubusercontent.com/micappe/ppxf_data/main/spectra_xsl_9.0.npz"
     }
   ]
 }

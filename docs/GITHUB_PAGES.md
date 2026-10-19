@@ -44,30 +44,19 @@ GitHub 仓库 → **Settings → Pages** → **Build and deployment**
 
 ---
 
-## 三、关于模板（重要）
+## 三、关于模板
 
-页面的「模板库 → 可下载模板」需要 `webapp/templates/*.npz`（emiles / fsps / galaxev，
-共约 48 MB）。它们默认被 `.gitignore` 排除，**不会**随仓库上传，所以有两种做法：
+页面的「模板库 → 可下载模板」的地址指向 **https://github.com/micappe/ppxf_data**
+（pPXF 官方数据仓库，含 emiles / fsps / galaxev / xsl 的 npz），每个条目在
+`webapp/templates/manifest.json` 里有 `url` 字段。
 
-### 做法 A（最简单，推荐）：把模板提交进仓库
+- **浏览器端**：点「下载」直接从 `raw.githubusercontent.com/micappe/ppxf_data` 拉取；
+- **服务器端**（`run.py`）：由服务器直接下载到工作区 `templates/`；
+- **构建时**：`pages.yml` 会执行 `python scripts/sync_templates.py --download`，
+  把模板一并放进站点（即使仓库里不存 npz，访问者也不用依赖外网）。
 
-```bash
-# 让 git 不再忽略模板 npz
-sed -i '/webapp\/templates\/\*\.npz/d' .gitignore
-
-# 从本机 ppxf_sew 自带目录补齐并提交
-python scripts/sync_templates.py --copy
-git add webapp/templates/*.npz .gitignore
-git commit -m "templates: 加入可下载模板"
-git push
-```
-
-这样 Pages 站点里模板可直接下载（每个文件 <50 MB，仓库总量也远小于 1 GB 限制）。
-
-### 做法 B：不提交模板
-
-站点仍可正常打开与使用，但点「下载」会提示 404；用户需要自己上传 `.npz`
-（或把模板放到工作区的 `templates/` 目录里）。
+如需完全离线：在本机执行 `python scripts/sync_templates.py --download`（或 `--copy`
+从 ppxf_sew 自带目录复制），再把 `webapp/templates/*.npz` 提交进仓库即可。
 
 ---
 

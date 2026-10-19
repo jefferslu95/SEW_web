@@ -705,12 +705,14 @@
             b.disabled = true;
             b.textContent = window.t ? t('tpl.msg.downloading') : '…';
             try {
+              // 默认从 ppxf_data（micappe/ppxf_data）下载；无 url 时用站点内副本
+              const srcUrl = e.url || (e.file ? ('templates/' + e.file) : '');
               if (computeOnServer()) {
-                // 服务器算力：用 SEW_web 自带的模板文件，服务器本地拷贝到 <root>/templates
-                await serverRpc('POST', '/api/templates/download', {},
-                                 { name: e.name, file: e.file });
+                const body = e.url ? { name: e.name, url: e.url }
+                  : { name: e.name, file: e.file };
+                await serverRpc('POST', '/api/templates/download', {}, body);
               } else {
-                const rec = await downloadTemplate(e.name, 'templates/' + e.file);
+                const rec = await downloadTemplate(e.name, srcUrl);
                 if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
               }
               if (window.loadTemplates) await window.loadTemplates();

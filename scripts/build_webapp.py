@@ -113,13 +113,21 @@ def copy_assets():
     os.makedirs(os.path.dirname(man), exist_ok=True)
     if not os.path.isfile(man):
         import json
-        data = {"templates": [
+        base = "https://raw.githubusercontent.com/micappe/ppxf_data/main/"
+        data = {"source": "https://github.com/micappe/ppxf_data",
+                "templates": [
             {"name": "emiles", "label": "EMILES (25×6)",
-             "file": "spectra_emiles_9.0.npz", "size_mb": 13},
+             "file": "spectra_emiles_9.0.npz", "size_mb": 13,
+             "url": base + "spectra_emiles_9.0.npz"},
             {"name": "fsps", "label": "FSPS (43×9)",
-             "file": "spectra_fsps_9.0.npz", "size_mb": 15},
+             "file": "spectra_fsps_9.0.npz", "size_mb": 15,
+             "url": base + "spectra_fsps_9.0.npz"},
             {"name": "galaxev", "label": "Galaxev (43×5)",
-             "file": "spectra_galaxev_9.0.npz", "size_mb": 20},
+             "file": "spectra_galaxev_9.0.npz", "size_mb": 20,
+             "url": base + "spectra_galaxev_9.0.npz"},
+            {"name": "xsl", "label": "XSL (26×8)",
+             "file": "spectra_xsl_9.0.npz", "size_mb": 94,
+             "url": base + "spectra_xsl_9.0.npz"},
         ]}
         open(man, "w", encoding="utf-8").write(
             json.dumps(data, ensure_ascii=False, indent=2))
