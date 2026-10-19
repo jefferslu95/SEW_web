@@ -8,7 +8,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const WS_DB = 'sew-workspace';
-  const WS_VER = 1;
+  const WS_VER = 2;   // 与 workspace.js 保持一致（版本只能升不能降）
 
   /* ================= IndexedDB 工作区 ================= */
   const WS = {
@@ -24,6 +24,9 @@
           }
           if (!db.objectStoreNames.contains('results')) {
             db.createObjectStore('results', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('meta')) {
+            db.createObjectStore('meta');
           }
         };
         req.onsuccess = () => res(req.result);
@@ -70,18 +73,23 @@
   };
 
   /* ================= Worker 通信 ================= */
-  const worker = new Worker('worker.js');
-  worker.onerror = (e) => {
-    console.error('worker error', e.message, e.filename, e.lineno);
-    setBootMsg('计算内核启动失败：' + e.message, true);
-  };
-  worker.onmessageerror = (e) => console.error('worker messageerror', e);
-  worker.postMessage({ type: 'init' });
+  let worker = null;
   let seq = 0;
   const waiting = new Map();
   let readyResolve;
   const ready = new Promise((r) => { readyResolve = r; });
   let booted = false;
+
+  function spawnWorker() {
+    worker = new Worker('worker.js');
+    worker.onerror = (e) => {
+      console.error('worker error', e.message, e.filename, e.lineno);
+      setBootMsg('计算内核启动失败：' + e.message, true);
+    };
+    worker.onmessageerror = (e) => console.error('worker messageerror', e);
+    worker.postMessage({ type: 'init' });
+    worker.onmessage = onWorkerMessage;
+  }
 
   function setBootMsg(msg, err) {
     const el = $('topStatus');
@@ -90,7 +98,7 @@
     el.className = 'status' + (err ? ' err' : '');
   }
 
-  worker.onmessage = (ev) => {
+  function onWorkerMessage(ev) {
     const m = ev.data || {};
     if (m.type === 'log') {
       console.log('[py]', m.msg);
@@ -126,10 +134,23 @@
       setBootMsg('计算内核出错：' + m.msg, true);
       return;
     }
-  };
+  }
+
+  // 等「工作区预初始化」（SW + 目录恢复）完成后再启动内核；即使失败也要启动
+  const preInit = (window.__sewPreInit || Promise.resolve())
+    .catch((e) => { console.warn('preInit failed', e); });
+  preInit.then(spawnWorker);
+
+  let wsSynced = null;
+  function ensureWs() {
+    if (!wsSynced) {
+      wsSynced = syncWorkspace().catch((e) => console.warn('syncWorkspace', e));
+    }
+    return wsSynced;
+  }
 
   function rpc(method, path, query, body) {
-    return ready.then(() => new Promise((res, rej) => {
+    return ready.then(ensureWs).then(() => new Promise((res, rej) => {
       const id = ++seq;
       waiting.set(id, { res, rej });
       worker.postMessage({
@@ -170,18 +191,50 @@
                   mtime: Date.now() };
     await WS.put('files', Object.assign({}, rec, { bytes }));
     await fsWrite(path, bytes);
+    // 镜像到工作区目录（若有）
+    const wsfs = window.SEWWS;
+    if (wsfs && wsfs.dir) {
+      const sub = kind === KIND_TPL ? 'templates' : 'data';
+      try { await wsfs.writeFile(sub, clean, new Blob([bytes])); }
+      catch (e) { console.warn('写入工作区失败', e); }
+    }
     return rec;
   }
 
   async function removeFile(rec) {
     await WS.del('files', rec.path);
     try { await fsDelete(rec.path); } catch (e) { /* ignore */ }
+    const wsfs = window.SEWWS;
+    if (wsfs && wsfs.dir) {
+      const sub = rec.kind === KIND_TPL ? 'templates' : 'data';
+      try { await wsfs.deleteFile(sub, rec.name); } catch (e) { /* ignore */ }
+    }
   }
 
   async function syncWorkspace() {
     const items = await WS.all('files');
     for (const it of items) {
       try { await fsWrite(it.path, it.bytes); } catch (e) { console.warn(e); }
+    }
+    // 从工作区目录导入尚未登记的文件（换浏览器 / 手放进去的）
+    const wsfs = window.SEWWS;
+    if (wsfs && wsfs.dir) {
+      const known = new Set(items.map((x) => x.name));
+      for (const [sub, kind] of [['templates', KIND_TPL], ['data', KIND_FITS]]) {
+        let names = [];
+        try { names = await wsfs.listDir(sub); } catch (e) { /* ignore */ }
+        for (const name of names) {
+          const isTpl = /\.npz$/i.test(name);
+          if ((kind === KIND_TPL) !== isTpl) continue;
+          if (known.has(name)) continue;
+          try {
+            const blob = await wsfs.readDirFile(sub, name);
+            const buf = new Uint8Array(await blob.arrayBuffer());
+            await addFile(kind, name, buf);
+            items.push({ name, kind });
+          } catch (e) { console.warn('导入工作区文件失败', name, e); }
+        }
+      }
     }
     return items;
   }
@@ -204,6 +257,23 @@
     };
     try {
       await WS.put('results', rec);
+      // 镜像到工作区 results/：<时间>_<模板>.json / .png
+      const wsfs = window.SEWWS;
+      if (wsfs && wsfs.dir) {
+        const d = new Date(rec.created);
+        const p2 = (n) => String(n).padStart(2, '0');
+        const stem = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-`
+          + `${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`
+          + `_${(rec.summary && rec.summary.template) || 'fit'}`;
+        try {
+          await wsfs.writeFile('results', stem + '.json',
+            new Blob([JSON.stringify(r)], { type: 'application/json' }));
+          if (r.plot_png) {
+            const b64 = String(r.plot_png).replace(/^data:image\/png;base64,/, '');
+            await wsfs.writeFile('results', stem + '.png', b64ToBlob(b64, 'image/png'));
+          }
+        } catch (e) { console.warn('写入工作区 results/ 失败', e); }
+      }
       renderWorkspace();
     } catch (e) { console.warn('保存结果失败', e); }
   }
@@ -467,7 +537,7 @@
   async function bindWorkspaceUI() {
     await WS.open();
     await ready;
-    await syncWorkspace();
+    await ensureWs();
     await renderWorkspace();
 
     const dl = $('wsTplDl');

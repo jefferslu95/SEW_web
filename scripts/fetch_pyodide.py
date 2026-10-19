@@ -73,6 +73,20 @@ def main() -> int:
            "--dest", WHEELS] + PYPI_WHEELS
     print("下载纯 Python 轮子：", " ".join(PYPI_WHEELS))
     subprocess.check_call(cmd)
+
+    # 供前端预热缓存 / 镜像到工作区用
+    manifest = []
+    for root, _dirs, fns in os.walk(os.path.join(BASE_DIR, "webapp", "vendor")):
+        for fn in fns:
+            if fn == "manifest.json":
+                continue
+            rel = os.path.relpath(os.path.join(root, fn),
+                                  os.path.join(BASE_DIR, "webapp", "vendor"))
+            manifest.append(rel.replace(os.sep, "/"))
+    mpath = os.path.join(BASE_DIR, "webapp", "vendor", "manifest.json")
+    with open(mpath, "w", encoding="utf-8") as f:
+        json.dump({"version": VERSION, "files": sorted(manifest)}, f, indent=1)
+    print(f"vendor/manifest.json：{len(manifest)} 个文件")
     print(f"完成。产物在 {os.path.join(BASE_DIR, 'webapp', 'vendor')}")
     return 0
 

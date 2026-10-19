@@ -351,5 +351,25 @@
   "ws.downloading": "Downloading template…",
   "ws.downloaded": "Template added to workspace: {name}",
   "ws.deleted": "Removed from workspace",
-  "ws.needUrl": "Enter a template URL first"
+  "ws.needUrl": "Enter a template URL first",
+  "ws.cache": "Save runtime to workspace",
+  "ws.caching": "Caching runtime…",
+  "ws.cached": "Saved",
+  "ws.cacheFail": "Failed",
+  "ws.cacheDone": "Cached {n} runtime files into the workspace",
+  "ws.dirAt": "Workspace: {name}",
+  "ws.dirNone": "Workspace: browser storage only",
+
+  "wiz.title": "Set up a workspace",
+  "wiz.desc": "Pick a local folder to store templates, FITS files and fit results; the runtime is cached there so you don't download it again.",
+  "wiz.li1": "templates/ — stellar templates (npz)",
+  "wiz.li2": "results/ — fit results (json + png)",
+  "wiz.li3": "data/ — imported FITS; cache/ — runtime copy",
+  "wiz.pick": "Choose folder…",
+  "wiz.skip": "Browser storage only",
+  "wiz.go": "Get started",
+  "wiz.mirror": "Save the runtime into the workspace (no re-download next time)",
+  "wiz.chosen": "Selected: {name}",
+  "wiz.browserOnly": "Using browser storage only; clearing site data removes everything.",
+  "wiz.unsupported": "This browser cannot access folders; using browser storage only."
 }

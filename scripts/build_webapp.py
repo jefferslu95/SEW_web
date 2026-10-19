@@ -58,12 +58,16 @@ def copy_static():
 
     html = open(os.path.join(STATIC, "index.html"), encoding="utf-8").read()
     html = html.replace('href="/static/style.css"', 'href="style.css"')
-    html = html.replace('src="/static/i18n.js"', 'src="i18n.js"')
     html = html.replace('src="/vendor/plotly.min.js"',
                         'src="vendor/plotly.min.js"')
     html = html.replace(
+        '<script src="/static/i18n.js"></script>',
+        '<script src="i18n.js"></script>\n'
+        '<script src="workspace.js"></script>\n'
+        '<script src="rpc.js"></script>')
+    html = html.replace(
         '<script src="/static/app.js"></script>',
-        '<script src="rpc.js"></script>\n<script src="app.js"></script>')
+        '<script src="app.js"></script>')
     html = html.replace("/static/", "")
     open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write(html)
     print("  index.html（改写资源路径 + 注入 rpc.js）")

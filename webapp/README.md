@@ -50,7 +50,31 @@ python -m http.server 8790 --directory webapp
 
 > 必须通过 HTTP 打开（`file://` 下 Worker/Pyodide 不可用）。
 
-## 工作区（模板 / 数据 / 结果）
+## 工作区（首次进入会引导设置）
+
+首次打开会弹出「设置工作区」：选一个本地文件夹（File System Access API）作为工作区，
+结构如下：
+
+```
+<工作区>/
+├── workspace.json    说明文件
+├── templates/        星族模板 npz
+├── results/          拟合结果 <时间>_<模板>.json / .png
+├── data/             导入的 FITS
+└── cache/vendor/     运行依赖副本（Pyodide + 轮子）
+```
+
+- 目录句柄存在 IndexedDB，下次打开自动恢复（浏览器只需再确认一次权限）。
+- **运行依赖不会重复下载**：`sw.js`（Service Worker）把 `vendor/**` 缓存在 CacheStorage；
+  首次引导时还会把依赖镜像到 `<工作区>/cache/vendor/`，即使浏览器缓存被清也能从目录恢复。
+  实测：第二次打开 vendor 请求 100% 命中缓存，网络传输 0 MB（启动 ~9 s 主要是 WASM 初始化）。
+- **拟合结果默认写入 `<工作区>/results/`**（同时保留 IndexedDB 索引供页面列出）。
+- 模板从 `<工作区>/templates/` 读取；手动拷进去的 npz 也会自动导入。
+- 不支持目录访问的浏览器（Firefox/Safari）退化为「仅浏览器存储」（IndexedDB），功能不变，
+  但清站点数据会丢。
+- 工作区面板里有「把运行依赖保存到工作区」按钮，可随时重新镜像。
+
+## 旧版说明（IndexedDB 工作区）
 
 - 全部保存在浏览器 **IndexedDB**（`sew-workspace`），刷新/重开浏览器仍在。
 - **模板**：可从 URL 下载（需 CORS）、上传 `.npz`、或拖拽文件到页面；同名模板自动出现在

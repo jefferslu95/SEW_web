@@ -361,3 +361,15 @@ summary:hover{color:var(--accent)}
   aside,#datasetCard,#viewCard{overflow:visible}
   .display-card{min-height:520px}
 }
+
+/* ---------------- 首次引导（工作区） ---------------- */
+.wizard{position:fixed;inset:0;background:rgba(12,20,36,.55);z-index:120;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard-box{background:#fff;border-radius:12px;box-shadow:0 18px 50px rgba(10,20,40,.35);
+  padding:20px 22px;max-width:520px;width:100%}
+.wizard-box h2{margin:0 0 6px;font-size:16px}
+.wizard-box p{margin:0 0 8px;color:var(--muted);font-size:12px;line-height:1.6}
+.wiz-list{margin:0 0 12px 18px;padding:0;color:#4a566d}
+.wiz-list li{margin:2px 0}
+.wiz-pick{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+.wiz-foot{margin-top:12px;display:flex;justify-content:flex-end}
