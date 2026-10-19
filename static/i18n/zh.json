@@ -411,6 +411,8 @@
   "set.bridgeFail2": "连不上。确认：① 服务器上 run.py 已在运行；② 本机已建立 SSH 隧道（ssh -N -L 8899:127.0.0.1:8899 用户@主机）或已运行本地桥；③ 服务器启动时带的 --cors 包含本页地址。",
   "ws.unset": "工作区：未设置",
   "ws.unsetShort": "未设置",
+  "ws.firstHint": "提示：工作区未设置也能用（数据默认存在浏览器里）。要存到目录，点左上角 SEWWweb 可设置工作区。",
+  "ws.needDirHint": "服务器工作区尚未设置：点左上角 SEWWweb →「工作区」里选择目录。",
   "ws.unsetHint": "尚未设置工作区，请点左上角 SEWweb 图标选择目录。",
   "ws.dl.start": "正在下载 {name}",
   "ws.dl.saving": "正在保存 {name}",

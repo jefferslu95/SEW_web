@@ -413,6 +413,8 @@
   "set.bridgeFail2": "Cannot connect. Check: (1) run.py is running on the server; (2) an SSH tunnel exists on this machine (ssh -N -L 8899:127.0.0.1:8899 user@host) or the local bridge is running; (3) the server was started with --cors including this page's origin.",
   "ws.unset": "Workspace: not set",
   "ws.unsetShort": "not set",
+  "ws.firstHint": "Tip: you can use the app without a workspace (data is kept in browser storage). Click SEWWweb at the top left to pick a folder.",
+  "ws.needDirHint": "No server workspace yet: click SEWWweb at the top left and choose a folder under Workspace.",
   "ws.unsetHint": "Workspace is not set yet. Click the SEWweb logo to choose a folder.",
   "ws.dl.start": "Downloading {name}",
   "ws.dl.saving": "Saving {name}",

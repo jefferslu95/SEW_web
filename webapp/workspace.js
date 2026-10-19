@@ -616,6 +616,8 @@
         { root: SEWWS.dirName || T('ws.unsetShort') }));
     } else if (SEWWS.dirName) {
       window.setStatus(T('hdr.compute.loc', { root: SEWWS.dirName }));
+    } else {
+      window.setStatus(T('hdr.compute.loc', { root: T('ws.unsetShort') }));
     }
   }
 
@@ -1131,19 +1133,21 @@
     setTimeout(applyHostStatus, 60);
     setTimeout(applyHostStatus, 1500);
     if (needDir) {
-      // 服务器模式但没有工作区目录：引导用户设置（不自动创建任何目录）
+      // 不再自动弹窗：只在状态栏与 toast 里提示入口（点左上角 SEWWweb 进设置）
       setTimeout(applyHostStatus, 60);
-      setTimeout(() => { openSettings().catch(() => {}); }, 300);
+      setTimeout(() => {
+        if (window.toast) window.toast(T('ws.needDirHint'));
+      }, 700);
     }
-    // 第一次进入（没有服务器工作区、没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
+    // 首次进入不弹窗，只在状态栏/toast 里提示入口（见下面 else if）
     let wantMirror = false;
-    let skipped = false;
-    try { skipped = !!(await SEWWS._metaGet('skipWizard')); } catch (e) { /* ignore */ }
-    if (!restored && !skipped) {
-      const r = await wizardFirstRun();
-      wantMirror = r.mirror && (SEWWS.backend === 'local');
-    } else if (restored) {
+    if (restored) {
       wantMirror = SEWWS.backend === 'local';
+    } else if (!serverMode) {
+      // 首次进入：不弹向导，只给一句提示（不设置也能用，数据在浏览器里）
+      setTimeout(() => {
+        if (window.toast) window.toast(T('ws.firstHint'));
+      }, 900);
     }
     if (SEWWS.dir || SEWWS.backend === 'server') {
       // 刚选定工作区：把面板状态与已有文件同步过来
