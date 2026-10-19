@@ -96,3 +96,61 @@ GitHub 仓库 → **Settings → Pages** → **Build and deployment**
 **Q：用自定义域名？**
 仓库 Settings → Pages → Custom domain，按提示配置 CNAME 即可；
 `webapp/` 里所有资源都是相对路径，不需要改代码。
+
+---
+
+## 六、推送失败排障（GitHub 连不上）
+
+### 症状 A：`GnuTLS recv error (-110)`
+
+```
+fatal: 无法访问 'https://github.com/<owner>/<repo>.git/'：
+GnuTLS recv error (-110): The TLS connection was non-properly terminated.
+```
+
+**不是仓库或凭据的问题，是 TCP 层连不上。** 先判断是哪一层：
+
+```bash
+getent hosts github.com                 # 看 DNS 解析到哪个 IP
+timeout 6 bash -c 'cat < /dev/null > /dev/tcp/github.com/443' && echo 443-OK
+```
+
+实测（CSST1）：DNS 给的是 `20.205.243.166`，该 IP 的 443 被阻断；但
+`140.82.112.3` / `140.82.113.3` / `20.27.177.113` 等官方 IP 的 443 正常，
+`github.com:22` 与 `ssh.github.com:443` 也可连。**即只有 DNS 指到的那个 IP 坏了。**
+
+### 解法 1（推荐）：改用 SSH
+
+```bash
+ls ~/.ssh/*.pub                                   # 没有就先 ssh-keygen -t ed25519
+ssh -T git@github.com                             # 应显示 Hi <user>! You've successfully authenticated
+git remote set-url origin git@github.com:<owner>/<repo>.git
+git push -u origin main
+```
+
+若提示 `Permission denied (publickey)`，把 `~/.ssh/id_*.pub` 的内容加到
+<https://github.com/settings/ssh/new> 即可。
+
+### 解法 2：仍走 HTTPS，但绕开坏 IP
+
+`scripts/gh_relay.py` 是一个只做 TCP 转发的本地 CONNECT 代理（TLS 仍由 git 完成，
+不改 hosts、不需要 root）：
+
+```bash
+python3 scripts/gh_relay.py 7899 &
+git -c http.proxy=http://127.0.0.1:7899 push
+```
+
+脚本会先试 DNS 给的 IP，连不上再依次尝试 `FALLBACK_IPS` 里的官方 IP 并缓存结果。
+
+### 症状 B：`Repository not found`
+
+```bash
+git ls-remote origin
+```
+
+- 报 `Repository not found` 且仓库确实存在 ⇒ 多半是**私有仓库**，需要认证
+  （HTTPS 用 Personal Access Token，别用账号密码）；或账号名/仓库名拼写不符。
+- 公开仓库无需认证即可 `ls-remote`。
+- 仓库还没建的话，先在 GitHub 上 New repository（**不要**勾选自动生成 README，
+  否则首次 push 要先 `git pull --rebase`）。
