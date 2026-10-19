@@ -10,6 +10,7 @@ import io
 import json
 import math
 import os
+import shutil
 import threading
 import time
 import traceback
@@ -664,7 +665,18 @@ def template_download():
     body = request.get_json(force=True, silent=True) or {}
     name = body.get("name") or "template"
     url = body.get("url")
+    file = body.get("file")
     try:
+        # 1) 优先用 SEW_web 自带的可下载模板（webapp/templates/*.npz）
+        if file or (url and not str(url).lower().startswith(("http://", "https://"))):
+            fn = os.path.basename(str(file or url))
+            src = os.path.join(WEBAPP_DIR, "templates", fn)
+            if not os.path.isfile(src):
+                return _err(f"自带模板不存在: {fn}（检查 webapp/templates/）", 404)
+            dst = os.path.join(templates.tpl_local(), fn)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(src, dst)
+            return jsonify(ok=True, path=dst, name=name)
         p = templates.download_template(name, url)
         return jsonify(ok=True, path=p, name=name)
     except Exception as e:

@@ -4,16 +4,16 @@
 
     python scripts/make_bundle.py                 # → dist/sew-web-server/
     python scripts/make_bundle.py --tar           # 另出 tar.gz
-    python scripts/make_bundle.py --with-vendor   # 连 Pyodide 运行时一起（浏览器算力）
-    python scripts/make_bundle.py --with-templates# 连可下载模板 npz 一起
+    python scripts/make_bundle.py --with-vendor    # 连 Pyodide 运行时一起（浏览器算力）
+    python scripts/make_bundle.py --no-templates   # 不带可下载模板 npz
 
 目标：把整个包 scp 到**任意一台机器**（不需要 SEW_web 源码仓库），
 ``python run.py --root <工作区>`` 就能用；工作区、上传、结果都在 --root 下，
 与程序目录完全隔离。
 
-包内不含：
-  * ``webapp/vendor``（Pyodide，≈60 MB）—— 服务器算力模式用不到
-  * ``webapp/templates/*.npz`` —— 服务器模板库由 ppxf_sew 自带提供
+包内默认带上 ``webapp/templates/*.npz``（清单里的可下载模板），
+网页端「模板库 → 可下载模板」直接从包里拷到工作区（无需外网）；
+不含 ``webapp/vendor``（Pyodide，≈60 MB）—— 服务器算力模式用不到。
 """
 from __future__ import annotations
 
@@ -61,6 +61,35 @@ def ignore(_dir, names):
     return [n for n in names if n in SKIP_DIRS or n.endswith(".pyc")]
 
 
+def _template_files(manifest_path):
+    """清单里的模板文件名（列表）。"""
+    import json
+    if not os.path.isfile(manifest_path):
+        return []
+    try:
+        man = json.load(open(manifest_path, encoding="utf-8"))
+        return [e["file"] for e in (man.get("templates") or []) if e.get("file")]
+    except Exception:
+        return []
+
+
+def _from_ppxf_sew(fn):
+    """从 ppxf_sew 自带模板目录找同名 npz。"""
+    cands = []
+    try:
+        from importlib import resources
+        cands.append(str(resources.files("ppxf_sew") / "example" / "sps_models"))
+    except Exception:
+        pass
+    cands.append(os.path.expanduser("~/.local/lib/python3.11/site-packages/"
+                                    "ppxf_sew/example/sps_models"))
+    for d in cands:
+        p = os.path.join(d, fn)
+        if os.path.isfile(p):
+            return p
+    return ""
+
+
 def copy_tree(src, dst):
     shutil.copytree(src, dst, ignore=ignore)
 
@@ -71,8 +100,8 @@ def main() -> int:
     ap.add_argument("--tar", action="store_true", help="另外生成 tar.gz")
     ap.add_argument("--with-vendor", action="store_true",
                     help="带上 Pyodide 运行时（浏览器算力模式需要）")
-    ap.add_argument("--with-templates", action="store_true",
-                    help="带上可下载的模板 npz")
+    ap.add_argument("--no-templates", action="store_true",
+                    help="不带可下载的模板 npz（默认带上）")
     args = ap.parse_args()
 
     out = os.path.abspath(args.out)
@@ -106,11 +135,18 @@ def main() -> int:
     man = os.path.join(web_src, "templates", "manifest.json")
     if os.path.isfile(man):
         shutil.copy2(man, os.path.join(tpl_dst, "manifest.json"))
-    if args.with_templates:
-        for fn in os.listdir(os.path.join(web_src, "templates")):
-            if fn.endswith(".npz"):
-                shutil.copy2(os.path.join(web_src, "templates", fn),
-                             os.path.join(tpl_dst, fn))
+    if not args.no_templates:
+        for fn in _template_files(man):
+            src = os.path.join(web_src, "templates", fn)
+            if not os.path.isfile(src):
+                alt = _from_ppxf_sew(fn)
+                if alt:
+                    shutil.copy2(alt, src)
+                    print(f"  补齐模板 {fn} ← {alt}")
+            if os.path.isfile(src):
+                shutil.copy2(src, os.path.join(tpl_dst, fn))
+            else:
+                print(f"⚠ 模板缺失: {fn}（运行 scripts/sync_templates.py --copy）")
 
     # 4) 可选：Pyodide 运行时（浏览器算力）
     if args.with_vendor:

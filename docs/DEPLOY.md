@@ -75,7 +75,7 @@ ssh -N -L 8791:127.0.0.1:8791 <user>@<服务器地址>
 SSH 连上的服务器通常**没有** SEW_web 源码。把运行所需文件打成一个可移植目录即可：
 
 ```bash
-# 本机打包（≈1 MB，不含 Pyodide / 模板 npz）
+# 本机打包（≈47 MB，含可下载模板；--no-templates 则 ≈1.2 MB）
 python scripts/make_bundle.py --tar
 # → dist/sew-web-server.tar.gz
 
@@ -91,8 +91,9 @@ ssh user@server 'cd /data/sew-web-server && \
   程序目录只读即可（除 `data/uploads`）。
 - 谱线表、示例谱已随包带（`data/line_use.dat`、`webapp/data/samples/`），
   不再依赖任何机器的绝对路径。
-- 模板库直接用服务器上装的 `ppxf_sew` 自带模板；「可下载模板」列表会自动
-  隐藏服务器已有的项。
+- **可下载模板随包带**（`webapp/templates/*.npz`，清单见 `templates/manifest.json`）：
+  网页点「下载」时服务器直接本地拷贝到 `<root>/templates/`（秒级，不走外部网络），
+  然后自动出现在「模板」列表与模板下拉。
 - 需要浏览器算力时才加 `--with-vendor`（带 60 MB Pyodide 运行时）。
 
 #### 隔离环境自测（模拟“ssh 到一台陌生服务器”）

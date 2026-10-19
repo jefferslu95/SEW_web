@@ -78,6 +78,8 @@ ssh -N -L 8791:127.0.0.1:8791 user@server
   不传时默认 `[--root, $HOME]`；`--token` 可给 `/api/ws/*` 加 `X-SEW-Token` 校验。
 - 模板、FITS、结果都写在服务器的 `<root>/templates|results|data/`；
   模板库（`/api/templates`）也优先读 `<root>/templates`。
+- **可下载模板随 SEW_web 一起分发**（`webapp/templates/*.npz`）：点下载即从包里
+  本地拷贝到 `<root>/templates/`，不依赖外网，也不用事先装 ppxf_sew 自带模板。
 - **`浏览` 列的是服务器端目录**（`/api/ws/browse`，限制在 `--allow-root` 内），
   选中 FITS 后只把**路径**发给后端，不传输文件内容。
 - **切换工作区**：点左上角 **SEWweb 图标** → 「工作区设置」面板 → 填服务器目录 → 应用

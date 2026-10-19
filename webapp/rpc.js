@@ -680,14 +680,6 @@
     if (avail) {
       avail.innerHTML = '';
       const have = new Set(tpls.map((r) => reShort(r.name)));
-      // 服务器算力：服务器模板库（ppxf_sew 自带 + <root>/templates）里已有的
-      // 就不用再"下载"了（服务器上的文件本来就是本地文件）
-      if (computeOnServer()) {
-        try {
-          const lib = await serverRpc('GET', '/api/templates', {}, {});
-          (lib.templates || []).forEach((tp) => have.add(String(tp.name).toLowerCase()));
-        } catch (e) { /* ignore */ }
-      }
       const man = await loadManifest();
       man.filter((e) => !have.has(e.name)).forEach((e) => {
         avail.appendChild(row(e.label || e.name, (e.size_mb || 0) * 1048576, [
@@ -697,10 +689,9 @@
             b.textContent = window.t ? t('tpl.msg.downloading') : '…';
             try {
               if (computeOnServer()) {
-                // 服务器算力：让服务器自己下载到 <root>/templates
-                const abs = new URL('templates/' + e.file, location.href).href;
+                // 服务器算力：用 SEW_web 自带的模板文件，服务器本地拷贝到 <root>/templates
                 await serverRpc('POST', '/api/templates/download', {},
-                                 { name: e.name, url: abs });
+                                 { name: e.name, file: e.file });
               } else {
                 const rec = await downloadTemplate(e.name, 'templates/' + e.file);
                 if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
