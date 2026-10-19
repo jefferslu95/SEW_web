@@ -80,6 +80,18 @@ ssh -N -L 8765:127.0.0.1:8765 user@server
 完整方案（Cloudflare Tunnel / nginx + TLS / Tailscale、GitHub 上传、常见问题）见
 **[docs/DEPLOY.md](docs/DEPLOY.md)**。
 
+### 1.4 部署到 GitHub Pages（纯浏览器版，推荐给分享/试用）
+
+浏览器端版本是纯静态站点（`webapp/`），可以直接托管在 GitHub Pages：
+
+1. 推送仓库到 GitHub；
+2. 仓库 **Settings → Pages → Source: GitHub Actions**；
+3. 之后每次推送 `main`，`.github/workflows/pages.yml` 自动构建并发布
+   （组装 `webapp/` → 下载 Pyodide 运行时 → 发布），地址形如
+   `https://<账号>.github.io/SEW_web/`。
+
+详细步骤与模板说明见 **[docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md)**。
+
 > ⚠️ 不要直接用 `--host 0.0.0.0` 裸奔到公网：`/api/browse` 能列目录、`/api/open`
 > 能打开任意路径，等于把服务器文件系统开放出去。
 

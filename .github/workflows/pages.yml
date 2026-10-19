@@ -1,0 +1,72 @@
+name: Deploy web app to GitHub Pages
+
+# 部署的是「浏览器端版本」（webapp/）：纯静态 + Pyodide，算力在访问者浏览器里。
+# 触发：推送到 main，或手动运行。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "static/**"
+      - "backend/**"
+      - "webapp/**"
+      - "scripts/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Assemble static site (webapp/)
+        run: python scripts/build_webapp.py
+
+      # Pyodide 运行时 + 轮子（≈57 MB），缓存避免每次重新下载
+      - name: Cache Pyodide runtime
+        uses: actions/cache@v4
+        with:
+          path: webapp/vendor
+          key: pyodide-v0.29.0-wheels-v1
+
+      - name: Fetch Pyodide runtime
+        run: python scripts/fetch_pyodide.py
+
+      - name: Check downloadable templates
+        run: |
+          python scripts/sync_templates.py || true
+
+      - name: Disable Jekyll
+        run: touch webapp/.nojekyll
+
+      - name: Show site size
+        run: du -sh webapp webapp/vendor webapp/templates || true
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: webapp
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
