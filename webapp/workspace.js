@@ -658,6 +658,7 @@
       : `
         <div class="set-sec">
           <div class="set-h" data-i18n="set.local"></div>
+          <div class="small muted" id="setStaticHint"></div>
           <div class="row">
             <button id="setLocal" class="ghost" data-i18n="wiz.pick"></button>
             <button id="setOpfs" class="ghost" data-i18n="wiz.opfs"></button>
@@ -680,6 +681,8 @@
     const cur = $('setCur');
     const paint = () => { cur.textContent = currentLabel(); };
     paint();
+    const sh = $('setStaticHint');
+    if (sh) sh.textContent = T('set.staticHint', { origin: location.origin });
 
     const close = () => el.remove();
     $('setClose').onclick = close;

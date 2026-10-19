@@ -373,5 +373,6 @@
   "set.workdirHint": "Templates, FITS files and fit results are stored here. Type a path or use Browse…",
   "hdr.compute.srv": "Compute: server · Workspace: {root}",
   "hdr.compute.loc": "Compute: this browser · Workspace: {root}",
-  "collapse.title.ws": "Expand / collapse workspace"
+  "collapse.title.ws": "Expand / collapse workspace",
+  "set.staticHint": "This page is a plain static deployment ({origin}) with no server backend, so “Choose folder” opens folders on this computer. To use folders on a server, open the page served by that server (run run.py there)."
 }
