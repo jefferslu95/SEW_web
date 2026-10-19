@@ -1000,9 +1000,26 @@
 
       const openBtn = $('depOpen');
       if (openBtn) {
-        openBtn.onclick = () => {
-          const port = (depPort.value || '8899').trim() || '8899';
-          window.open('http://127.0.0.1:' + port, '_blank');
+        openBtn.onclick = async () => {
+          const url = ((depUrl && depUrl.value) || '').trim()
+            || ('http://127.0.0.1:' + ((depPort.value || '8899').trim()));
+          if (!url) return;
+          sayDep(T('set.bridgeBusy'), false);
+          openBtn.disabled = true;
+          SEWWS.setApiBase(url);
+          const info = await SEWWS.detectServer();
+          openBtn.disabled = false;
+          if (!info) {
+            const why = (SEWWS._lastErr && (SEWWS._lastErr.message
+              || String(SEWWS._lastErr))) || '';
+            SEWWS.setApiBase('');
+            sayDep(T('set.bridgeFail2') + (why ? '  [' + why + ']' : ''), true);
+            return;
+          }
+          SEWWS.useServer(info);
+          await SEWWS.setPref('server');
+          sayDep(T('set.bridgeOk', { root: info.root || '' }), false);
+          location.reload();          // 页面仍是本页（GitHub Pages）
         };
       }
 
