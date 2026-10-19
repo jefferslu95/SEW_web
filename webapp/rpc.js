@@ -639,7 +639,6 @@
   async function renderWorkspaceNow() {
     const details = $('wsDetails');
     if (!details) return;
-    details.classList.remove('hidden');
     let tpls, fits, results;
     if (computeOnServer()) {
       // 服务器算力：模板/数据以 <root>/templates|data 为准，下载后刷新即出现

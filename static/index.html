@@ -99,36 +99,6 @@
         <div class="row"><label class="chk"><input id="ovWaveLog" type="checkbox"/> <span data-i18n="data.wavelog"></span></label></div>
         <button id="applyOverride" class="ghost" data-i18n="data.apply"></button>
       </details>
-
-      <details id="wsDetails" class="hidden">
-        <summary><span data-i18n="ws.title"></span> <span id="wsStatus" class="muted"></span></summary>
-        <div class="row small muted"><span id="wsHint" data-i18n="ws.hint"></span></div>
-        <div class="row small muted">
-          <span id="wsDirStatus"></span>
-          <button id="wsCacheBtn" class="ghost small" data-i18n="ws.cache"></button>
-        </div>
-
-        <h4 data-i18n="ws.templates"></h4>
-        <div id="wsTplList" class="wslist"></div>
-        <h4 data-i18n="ws.available"></h4>
-        <div id="wsAvailList" class="wslist"></div>
-        <div class="row">
-          <input id="wsTplUrl" type="text" style="flex:1;min-width:0"
-                 data-i18n-ph="ws.url.ph"/>
-          <button id="wsTplDl" class="ghost small" data-i18n="tpl.download"></button>
-        </div>
-        <div class="row">
-          <label class="upload-btn small"><span data-i18n="tpl.upload"></span>
-            <input id="wsTplUp" type="file" accept=".npz"/>
-          </label>
-        </div>
-
-        <h4 data-i18n="ws.data"></h4>
-        <div id="wsFileList" class="wslist"></div>
-
-        <h4 data-i18n="ws.results"></h4>
-        <div id="wsResList" class="wslist"></div>
-      </details>
       </div>
     </section>
 
@@ -215,6 +185,41 @@
         <div class="cbar-grad"></div>
         <div class="cbar-labels"><span id="cbarMin">-</span><span id="cbarMax">-</span></div>
       </div>
+      </div>
+    </section>
+
+    <section class="card" id="wsCard">
+      <h3><span data-i18n="ws.title"></span>
+        <button class="collapse-btn" data-target="wsDetails"
+                data-i18n-title="collapse.title.ws">▾</button></h3>
+      <div id="wsDetails">
+        <div class="row small muted"><span id="wsHint" data-i18n="ws.hint"></span></div>
+        <div class="row small muted">
+          <span id="wsDirStatus"></span>
+          <button id="wsCacheBtn" class="ghost small" data-i18n="ws.cache"></button>
+        </div>
+        <div id="wsStatus" class="small muted"></div>
+
+        <h4 data-i18n="ws.templates"></h4>
+        <div id="wsTplList" class="wslist"></div>
+        <h4 data-i18n="ws.available"></h4>
+        <div id="wsAvailList" class="wslist"></div>
+        <div class="row">
+          <input id="wsTplUrl" type="text" style="flex:1;min-width:0"
+                 data-i18n-ph="ws.url.ph"/>
+          <button id="wsTplDl" class="ghost small" data-i18n="tpl.download"></button>
+        </div>
+        <div class="row">
+          <label class="upload-btn small"><span data-i18n="tpl.upload"></span>
+            <input id="wsTplUp" type="file" accept=".npz"/>
+          </label>
+        </div>
+
+        <h4 data-i18n="ws.data"></h4>
+        <div id="wsFileList" class="wslist"></div>
+
+        <h4 data-i18n="ws.results"></h4>
+        <div id="wsResList" class="wslist"></div>
       </div>
     </section>
 

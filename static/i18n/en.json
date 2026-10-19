@@ -372,5 +372,6 @@
   "set.workdir": "Workspace",
   "set.workdirHint": "Templates, FITS files and fit results are stored here. Type a path or use Browse…",
   "hdr.compute.srv": "Compute: server · Workspace: {root}",
-  "hdr.compute.loc": "Compute: this browser · Workspace: {root}"
+  "hdr.compute.loc": "Compute: this browser · Workspace: {root}",
+  "collapse.title.ws": "Expand / collapse workspace"
 }

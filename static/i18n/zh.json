@@ -372,5 +372,6 @@
   "set.workdir": "工作区",
   "set.workdirHint": "模板、FITS 与拟合结果都保存在这里；可直接输入路径，或点「浏览…」逐级选择。",
   "hdr.compute.srv": "算力：服务器 · 工作区：{root}",
-  "hdr.compute.loc": "算力：本浏览器 · 工作区：{root}"
+  "hdr.compute.loc": "算力：本浏览器 · 工作区：{root}",
+  "collapse.title.ws": "展开 / 收起工作区"
 }
