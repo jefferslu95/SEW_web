@@ -1,9 +1,17 @@
 # SEW web — FITS 光谱 / 数据立方 查看与拟合
 
 网页版交互工具：**打开 → 自动识别 → 看图 → 点像素 → pPXF / ppxf-sew 拟合 → 出图/导出**。
-浏览器端不需要 Python；所有读取、识别、拟合、绘图都在后端完成。
 
-技术栈：Flask + astropy + numpy/scipy + matplotlib + ppxf / ppxf-sew + Plotly（本地提供，无需 CDN）。
+同一套算法有两种跑法：
+
+| 模式 | 算力 | 适合 | 入口 |
+|---|---|---|---|
+| **浏览器端（纯静态）** | 访问者自己的 CPU（Pyodide / WebAssembly） | 不想装环境、要分享链接、数据不能出本机 | `webapp/`（见 [webapp/README.md](webapp/README.md)） |
+| **服务器端（Flask）** | 服务器 CPU | 大 cube、多入共享、需要快 | `python run.py` |
+
+两种模式共用 `backend/` 里同一套算法代码，结果口径一致。
+
+技术栈：astropy + numpy/scipy + matplotlib + ppxf / ppxf-sew + Plotly（本地提供，无需 CDN）。
 
 ---
 

@@ -1,6 +1,7 @@
 {
   "doc.title": "SEW web — FITS spectrum / cube viewer & fitter",
   "hdr.path.ph": "FITS path on the server, or click Browse / Upload",
+  "hdr.path.ph.wasm": "Workspace path (or drag & drop / upload a FITS file)",
   "hdr.sample": "Example: {path}",
   "hdr.open": "Open",
   "hdr.browse": "Browse…",
@@ -332,5 +333,23 @@
   "log.statsfail": "Failed to compute mean age/metallicity: {err}",
   "log.plotfail": "p.plot() rendering failed: {err}",
   "log.wplotfail": "template.plot() rendering failed: {err}",
-  "log.dustfit": "Dust fit: {parts}"
+  "log.dustfit": "Dust fit: {parts}",
+
+  "ws.title": "Workspace",
+  "ws.hint": "Templates and fit results are stored in this browser (IndexedDB); nothing is uploaded.",
+  "ws.templates": "Templates",
+  "ws.available": "Available for download",
+  "ws.data": "Data files",
+  "ws.results": "Fit results",
+  "ws.url.ph": "http(s) URL of a template npz (CORS allowed)",
+  "ws.empty": "(empty)",
+  "ws.use": "Use",
+  "ws.download": "Download",
+  "ws.open": "Open",
+  "ws.del": "Delete",
+  "ws.saved": "{n} item(s) saved",
+  "ws.downloading": "Downloading template…",
+  "ws.downloaded": "Template added to workspace: {name}",
+  "ws.deleted": "Removed from workspace",
+  "ws.needUrl": "Enter a template URL first"
 }

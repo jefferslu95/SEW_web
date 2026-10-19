@@ -1,6 +1,7 @@
 {
   "doc.title": "SEW web — FITS 光谱 / 数据立方 查看与拟合",
   "hdr.path.ph": "服务器上的 FITS 路径，或点击「浏览」/「上传」",
+  "hdr.path.ph.wasm": "工作区文件路径（也可直接拖拽 / 上传 FITS 文件）",
   "hdr.sample": "示例：{path}",
   "hdr.open": "打开",
   "hdr.browse": "浏览…",
@@ -332,5 +333,23 @@
   "log.statsfail": "平均年龄/金属丰度计算失败: {err}",
   "log.plotfail": "p.plot() 渲染失败: {err}",
   "log.wplotfail": "template.plot() 渲染失败: {err}",
-  "log.dustfit": "尘埃消光拟合: {parts}"
+  "log.dustfit": "尘埃消光拟合: {parts}",
+
+  "ws.title": "工作区",
+  "ws.hint": "模板与拟合结果保存在本浏览器（IndexedDB），不上传服务器。",
+  "ws.templates": "模板",
+  "ws.available": "可下载模板",
+  "ws.data": "数据文件",
+  "ws.results": "拟合结果",
+  "ws.url.ph": "模板 npz 的 http(s) URL（需允许跨域）",
+  "ws.empty": "（空）",
+  "ws.use": "使用",
+  "ws.download": "下载",
+  "ws.open": "打开",
+  "ws.del": "删除",
+  "ws.saved": "已保存 {n} 项",
+  "ws.downloading": "下载模板…",
+  "ws.downloaded": "模板已加入工作区：{name}",
+  "ws.deleted": "已从工作区删除",
+  "ws.needUrl": "请先填写模板 URL"
 }

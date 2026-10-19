@@ -26,6 +26,9 @@ const S = {
   _browsePick: null,     // 浏览弹窗的文件选择回调（用于选 LSF 参考文件）
 };
 
+// 浏览器端（Pyodide）恢复历史结果时需要把 jobId 写回当前状态
+window.sewSetJobId = (id) => { S.jobId = id; };
+
 /* ------------------------------------------------------------------ */
 /* 基础工具                                                            */
 /* ------------------------------------------------------------------ */
@@ -44,6 +47,8 @@ function setStatus(s, err = false) {
 }
 
 async function api(url, opts) {
+  // 浏览器端（Pyodide）模式：由 rpc.js 提供 window.sewApi，不访问服务器
+  if (typeof window.sewApi === 'function') return window.sewApi(url, opts);
   const r = await fetch(url, opts);
   let j;
   try { j = await r.json(); } catch (e) {
@@ -2428,13 +2433,24 @@ function renderResult(r, target) {
   }).join('\n');
 
   const jid = S.jobId;
-  $('exportJson').href = `/api/fit/export/${jid}?fmt=json`;
-  $('exportFits').href = `/api/fit/export/${jid}?fmt=fits`;
+  if (typeof window.sewExport === 'function') {
+    $('exportJson').onclick = (e) => { e.preventDefault(); window.sewExport(jid, 'json'); };
+    $('exportFits').onclick = (e) => { e.preventDefault(); window.sewExport(jid, 'fits'); };
+    $('exportJson').removeAttribute('href');
+    $('exportFits').removeAttribute('href');
+  } else {
+    $('exportJson').href = `/api/fit/export/${jid}?fmt=json`;
+    $('exportFits').href = `/api/fit/export/${jid}?fmt=fits`;
+  }
   $('exportJson').download = `sew_fit_${jid}.json`;
   $('exportFits').download = `sew_fit_${jid}.fits`;
   $('exportRow').style.display = '';
 
   showResultTab('native');
+  // 浏览器端：把结果存进工作区（IndexedDB）
+  if (typeof window.sewOnResult === 'function') {
+    try { window.sewOnResult(r, S.jobId, target); } catch (e) { console.warn(e); }
+  }
   // 完成后收起进度行（结果面板已有完整信息），避免右栏比面板高出一截
   $('fitProgressWrap').classList.add('hidden');
   requestAnimationFrame(syncPanelHeight);

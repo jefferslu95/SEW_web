@@ -136,6 +136,21 @@ summary:hover{color:var(--accent)}
 #tplDetails summary #tplStatus{color:var(--muted);font-size:11px;
   margin-left:4px}
 #tplDetails[open] summary{color:var(--accent)}
+/* 工作区（浏览器端）：模板 / 数据 / 拟合结果 */
+#wsDetails{margin-top:10px;padding-top:6px;border-top:1px dashed var(--line)}
+#wsDetails summary{font-size:12px;color:#33405a;display:block;
+  white-space:normal;line-height:1.5}
+#wsDetails h4{margin:9px 0 3px;font-size:11.5px;color:#33405a}
+.wslist{max-height:150px;overflow:auto;border:1px solid var(--line);
+  border-radius:6px;background:#fbfcfe}
+.wslist:empty{display:none}
+.wsrow{display:flex;align-items:center;gap:6px;padding:3px 6px;
+  font-size:11.5px;border-bottom:1px solid #eef1f6}
+.wsrow:last-child{border-bottom:none}
+.wsrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.wsrow .sz{color:var(--muted);font-size:10.5px}
+.wsrow button{padding:1px 6px;font-size:10.5px;border-radius:5px}
 .row{display:flex;align-items:center;gap:7px;margin-top:7px}
 .row.topbar{margin-top:0;margin-bottom:6px}
 .row.wrap{flex-wrap:wrap}

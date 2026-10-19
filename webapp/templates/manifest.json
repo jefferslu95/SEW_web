@@ -1,0 +1,22 @@
+{
+  "templates": [
+    {
+      "name": "emiles",
+      "label": "EMILES (25×6)",
+      "file": "spectra_emiles_9.0.npz",
+      "size_mb": 13
+    },
+    {
+      "name": "fsps",
+      "label": "FSPS (43×9)",
+      "file": "spectra_fsps_9.0.npz",
+      "size_mb": 15
+    },
+    {
+      "name": "galaxev",
+      "label": "Galaxev (43×5)",
+      "file": "spectra_galaxev_9.0.npz",
+      "size_mb": 20
+    }
+  ]
+}

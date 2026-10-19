@@ -11,6 +11,9 @@
 (function () {
   const STORAGE_KEY = 'sew.lang';
   const FALLBACK_LANG = 'zh';
+  // 语言文件与本脚本同目录下的 i18n/（服务器版与纯静态版通用）
+  const BASE = new URL('.', document.currentScript && document.currentScript.src
+                          || document.baseURI);
 
   const I18N = {
     lang: FALLBACK_LANG,
@@ -20,7 +23,8 @@
 
     async _fetch(lang) {
       if (!this._cache[lang]) {
-        const r = await fetch(`/static/i18n/${lang}.json`, { cache: 'no-cache' });
+        const url = new URL(`i18n/${lang}.json`, BASE).href;
+        const r = await fetch(url, { cache: 'no-cache' });
         if (!r.ok) throw new Error(`i18n: cannot load ${lang}.json (HTTP ${r.status})`);
         this._cache[lang] = await r.json();
       }

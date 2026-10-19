@@ -12,3 +12,16 @@ server.log
 # 浏览器端：Pyodide 运行时 / 轮子 / 大模板，用 scripts/fetch_pyodide.py 生成
 webapp/vendor/
 webapp/templates/*.npz
+
+# webapp 生成物（由 scripts/build_webapp.py 重建）
+webapp/index.html
+webapp/app.js
+webapp/style.css
+webapp/i18n.js
+webapp/i18n/
+webapp/data/
+webapp/py/backend/__init__.py
+webapp/py/backend/fits_io.py
+webapp/py/backend/fitting.py
+webapp/py/backend/templates.py
+webapp/py/backend/binning.py
