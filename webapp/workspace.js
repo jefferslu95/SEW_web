@@ -301,6 +301,9 @@
       $('wizGo').onclick = async () => {
         const mirror = $('wizMirror').checked;
         w.remove();
+        if (!SEWWS.dir) {
+          try { await SEWWS._metaPut('skipWizard', true); } catch (e) { /* ignore */ }
+        }
         resolve({ mirror, dir: SEWWS.dir });
       };
       if (!FS_SUPPORTED) {
@@ -348,12 +351,14 @@
   }
 
   SEWWS.ready = preInit().then(async (restored) => {
-    // 第一次进入（没有已授权目录）→ 弹引导
+    // 第一次进入（没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
     let wantMirror = false;
-    if (!restored) {
+    let skipped = false;
+    try { skipped = !!(await SEWWS._metaGet('skipWizard')); } catch (e) { /* ignore */ }
+    if (!restored && !skipped) {
       const r = await wizardFirstRun();
       wantMirror = r.mirror && !!SEWWS.dir;
-    } else {
+    } else if (restored) {
       wantMirror = true;
     }
     if (wantMirror && SEWWS.dir) {
