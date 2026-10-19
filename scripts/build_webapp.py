@@ -15,12 +15,36 @@
 """
 import os
 import shutil
+import subprocess
 import sys
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(BASE, "backend")
 STATIC = os.path.join(BASE, "static")
 OUT = os.path.join(BASE, "webapp")
+
+
+def asset_version():
+    """前端资源版本号（用于 cache-busting）。
+
+    GitHub Pages 给 .js/.css 发 ``cache-control: max-age=600``；一旦 index.html
+    先更新、而浏览器还在用缓存的旧 app.js，就会出现“按钮存在但点了没反应”。
+    把所有资源引用改成 ``app.js?v=<commit>`` 即可避免。
+    """
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=BASE, stderr=subprocess.DEVNULL).decode().strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    try:
+        return str(int(max(
+            os.path.getmtime(os.path.join(STATIC, f))
+            for f in ("app.js", "style.css", "i18n.js", "index.html"))))
+    except Exception:
+        return "0"
 
 MODULES = ["__init__.py", "fits_io.py", "fitting.py", "templates.py",
            "binning.py"]
@@ -69,8 +93,11 @@ def copy_static():
         '<script src="/static/app.js"></script>',
         '<script src="app.js"></script>')
     html = html.replace("/static/", "")
+    ver = asset_version()
+    for name in ("style.css", "app.js", "i18n.js", "workspace.js", "rpc.js"):
+        html = html.replace('"%s"' % name, '"%s?v=%s"' % (name, ver))
     open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write(html)
-    print("  index.html（改写资源路径 + 注入 rpc.js）")
+    print("  index.html（改写资源路径 + 注入 rpc.js + 版本 %s）" % ver)
 
 
 def copy_assets():
