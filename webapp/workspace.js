@@ -354,11 +354,10 @@
         ]);
       } catch (e) { console.warn('SW 注册失败', e); }
     }
-    // 1) 服务器工作区（远程部署/SSH 转发时优先；用户显式选过本地则不覆盖）
-    let pref = null;
-    try { pref = await SEWWS._metaGet('backend'); } catch (e) { /* ignore */ }
+    // 1) 页面由「算力服务器」提供（同源有 /api/ws/*）：工作区就是这台服务器的目录。
+    //    这里必须忽略浏览器本地偏好：在 SSH 服务器上的网页里不该出现本机目录。
     const srv = await SEWWS.detectServer();
-    if (srv && srv.writable && pref !== 'local' && pref !== 'browser') {
+    if (srv && srv.writable) {
       SEWWS.useServer(srv);
       return { restored: true, server: true };
     }
@@ -542,9 +541,13 @@
     catch (e) { console.warn(e); }
     try { if (typeof afterBoot === 'function') await afterBoot(); }
     catch (e) { console.warn(e); }
-    // 状态栏跟着工作区走（服务器算力下这里显示"算力 · 工作区"）
-    if (SEWWS.serverCompute() && typeof window.setStatus === 'function') {
-      window.setStatus('服务器算力 · 工作区 ' + (SEWWS.dirName || ''));
+    // 状态栏跟着工作区走
+    if (typeof window.setStatus === 'function') {
+      if (SEWWS.serverCompute()) {
+        window.setStatus(T('hdr.compute.srv', { root: SEWWS.dirName || '' }));
+      } else if (!SEWWS.serverCompute() && SEWWS.dirName) {
+        window.setStatus(T('hdr.compute.loc', { root: SEWWS.dirName }));
+      }
     }
     if (window.toast) window.toast(msg || T('set.changed'));
   }
@@ -575,7 +578,6 @@
           <button id="dpGo" class="ghost" data-i18n="modal.go"></button>
           <button id="dpUp" class="ghost" data-i18n="modal.up"></button>
         </div>
-        <div id="dpRoots" class="small muted" style="margin-top:4px"></div>
         <div id="dpMsg" class="small" style="color:#b45309;margin-top:2px"></div>
         <div class="browselist"><div id="dpDirs"></div></div>
         <div class="wiz-foot" style="display:flex;gap:8px;margin-top:8px">
@@ -598,16 +600,6 @@
         const j = await browseDirs(path);
         shown.path = j.path;
         $('dpPath').value = j.path;
-        const roots = $('dpRoots');
-        roots.innerHTML = '';
-        (j.roots || []).forEach((rp) => {
-          const b = document.createElement('button');
-          b.className = 'ghost';
-          b.style.marginRight = '6px';
-          b.textContent = rp;
-          b.onclick = () => render(rp);
-          roots.appendChild(b);
-        });
         const box = $('dpDirs');
         box.innerHTML = '';
         if (!j.dirs.length) {
@@ -649,21 +641,21 @@
     const el = document.createElement('div');
     el.id = 'wsSettings';
     el.className = 'wizard';
-    el.innerHTML = `
-      <div class="wizard-box">
-        <h2 data-i18n="set.title"></h2>
-        <p class="small"><span data-i18n="set.current"></span>
-          <b id="setCur"></b></p>
+    const onServer = SEWWS.backend === 'server';
+    // 只展示“当前宿主的工作区”：页面由服务器提供时就是服务器目录，
+    // 纯静态页面时才是浏览器/本地目录（避免在 SSH 页面里误选本机目录）。
+    const sec = onServer
+      ? `
         <div class="set-sec">
-          <div class="set-h" data-i18n="set.server"></div>
-          <div class="small muted" data-i18n="set.serverHint"></div>
+          <div class="set-h" data-i18n="set.workdir"></div>
+          <div class="small muted" data-i18n="set.workdirHint"></div>
           <div class="row" style="margin-top:6px">
             <input id="setSrvPath" type="text" style="flex:1;min-width:0"/>
             <button id="setSrvBrowse" class="ghost" data-i18n="set.browse"></button>
             <button id="setSrvApply" class="primary" data-i18n="set.apply"></button>
           </div>
-          <div id="setRoots" class="small muted" style="margin-top:4px"></div>
-        </div>
+        </div>`
+      : `
         <div class="set-sec">
           <div class="set-h" data-i18n="set.local"></div>
           <div class="row">
@@ -671,7 +663,13 @@
             <button id="setOpfs" class="ghost" data-i18n="wiz.opfs"></button>
             <button id="setBrowser" class="ghost" data-i18n="wiz.skip"></button>
           </div>
-        </div>
+        </div>`;
+    el.innerHTML = `
+      <div class="wizard-box">
+        <h2 data-i18n="set.title"></h2>
+        <p class="small"><span data-i18n="set.current"></span>
+          <b id="setCur"></b></p>
+        ${sec}
         <div class="wiz-foot">
           <button id="setClose" class="ghost" data-i18n="modal.close"></button>
         </div>
@@ -682,40 +680,39 @@
     const cur = $('setCur');
     const paint = () => { cur.textContent = currentLabel(); };
     paint();
-    $('setSrvPath').value = (SEWWS.backend === 'server' && SEWWS.dirName)
-      || (SEWWS.server && SEWWS.server.root) || '';
-    // 允许范围（后端 --allow-root / SEW_WS_ALLOW），直接告诉用户为什么会被拒
-    const rootBox = $('setRoots');
-    const roots = (SEWWS.server && SEWWS.server.roots) || [];
-    if (rootBox) {
-      rootBox.textContent = roots.length
-        ? T('set.roots') + ' ' + roots.join('  ·  ') : '';
-    }
-
-    $('setSrvBrowse').onclick = () => {
-      const start = ($('setSrvPath').value || '').trim()
-        || (roots.length ? roots[0] : '');
-      openDirPicker(start, (p) => { $('setSrvPath').value = p; });
-    };
 
     const close = () => el.remove();
     $('setClose').onclick = close;
     el.addEventListener('click', (e) => { if (e.target === el) close(); });
 
-    $('setSrvApply').onclick = async () => {
-      const path = ($('setSrvPath').value || '').trim();
-      if (!path) return;
-      const btn = $('setSrvApply');
-      btn.disabled = true;
-      try {
-        await SEWWS.setServerRoot(path);
-        paint();
-        await refreshAfterSwitch();
-      } catch (e) {
-        if (window.toast) window.toast(T('set.badRoot', { msg: e.message || e }), 'err');
-      } finally { btn.disabled = false; }
-    };
+    if (onServer) {
+      const pathInp = $('setSrvPath');
+      if (pathInp) pathInp.value = (SEWWS.dirName)
+        || (SEWWS.server && SEWWS.server.root) || '';
 
+      $('setSrvBrowse').onclick = () => {
+        const start = ($('setSrvPath').value || '').trim();
+        openDirPicker(start, (p) => {
+          const inp = $('setSrvPath');
+          if (inp) inp.value = p;
+        });
+      };
+
+      $('setSrvApply').onclick = async () => {
+        const path = ($('setSrvPath').value || '').trim();
+        if (!path) return;
+        const btn = $('setSrvApply');
+        btn.disabled = true;
+        try {
+          await SEWWS.setServerRoot(path);
+          paint();
+          await refreshAfterSwitch();
+        } catch (e) {
+          if (window.toast) window.toast(T('set.badRoot', { msg: e.message || e }), 'err');
+        } finally { btn.disabled = false; }
+      };
+      return;
+    }
     $('setLocal').onclick = async () => {
       try {
         const h = await SEWWS.pickDir();

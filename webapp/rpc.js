@@ -832,9 +832,9 @@
     const p = $('pathInput');
     bindWorkspaceUI().then(() => {
       if (computeOnServer()) {
-        // 服务器算力：状态栏显示当前工作区
+        // 顶部明确显示：算力在哪、工作区在哪
         const ws = window.SEWWS;
-        setBootMsg('服务器算力 · 工作区 ' + (ws && ws.dirName ? ws.dirName : ''));
+        setBootMsg(t('hdr.compute.srv', { root: (ws && ws.dirName) || '' }));
       } else if (p && window.t) {
         // 浏览器端没有「服务器路径」概念，改提示
         p.placeholder = t('hdr.path.ph.wasm');
