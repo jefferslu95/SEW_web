@@ -255,10 +255,10 @@
     }
     const rec = { path, name: clean, kind, size: bytes.byteLength || bytes.length,
                   mtime: Date.now() };
-    // 服务器算力不把文件字节存进 IndexedDB（避免重复占空间）
-    await WS.put('files', onServer ? rec : Object.assign({}, rec, { bytes }));
+    if (onServer) return rec;          // 服务器目录即真相，不存浏览器副本
+    await WS.put('files', Object.assign({}, rec, { bytes }));
     // 本地目录 / 静态服务器的服务器工作区：镜像一份
-    if (!onServer && wsfs && (wsfs.dir || wsfs.backend === 'server')) {
+    if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
       try { await wsfs.writeFile(sub, clean, new Blob([bytes])); }
       catch (e) { console.warn('写入工作区失败', e); }
     }
@@ -266,13 +266,13 @@
   }
 
   async function removeFile(rec) {
-    await WS.del('files', rec.path);
     const wsfs = window.SEWWS;
     const sub = rec.kind === KIND_TPL ? 'templates' : 'data';
     if (computeOnServer()) {
       try { await wsfs.deleteFile(sub, rec.name); } catch (e) { /* ignore */ }
       return;
     }
+    await WS.del('files', rec.path);
     try { await fsDelete(rec.path); } catch (e) { /* ignore */ }
     if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
       try { await wsfs.deleteFile(sub, rec.name); } catch (e) { /* ignore */ }
@@ -280,34 +280,9 @@
   }
 
   /* 服务器算力：只对账文件名（不下载内容） */
-  async function syncWorkspaceServer() {
-    const wsfs = window.SEWWS;
-    const items = await WS.all('files');
-    const known = new Set(items.map((x) => x.name + '::' + x.kind));
-    for (const [sub, kind] of [['templates', KIND_TPL], ['data', KIND_FITS]]) {
-      let files = [];
-      try {
-        const r = await fetch('api/ws/list?' + new URLSearchParams({ dir: sub }),
-          { cache: 'no-store', headers: wsfs._hdr() });
-        const j = await r.json();
-        files = (j && j.files) || [];
-      } catch (e) { continue; }
-      for (const f of files) {
-        const nm = typeof f === 'string' ? f : f.name;
-        const size = typeof f === 'string' ? 0 : f.size;
-        const mt = typeof f === 'string' ? Date.now() / 1000 : f.mtime;
-        if (known.has(nm + '::' + kind)) continue;
-        await WS.put('files', {
-          path: String(wsfs.server.root).replace(/\/+$/, '') + '/' + sub + '/' + nm,
-          name: nm, kind, size, mtime: (mt || 0) * 1000,
-        });
-      }
-    }
-    return items;
-  }
-
   async function syncWorkspace() {
-    if (computeOnServer()) return syncWorkspaceServer();
+    // 服务器算力：列表直接读 <root>/templates|data，不需要把文件拉进内存 FS
+    if (computeOnServer()) return [];
     const items = await WS.all('files');
     for (const it of items) {
       try { await fsWrite(it.path, it.bytes); } catch (e) { console.warn(e); }
@@ -604,6 +579,26 @@
     return Math.max(1, Math.round(n / 1024)) + ' KB';
   }
 
+  /* 服务器工作区：直接读目录（服务器就是唯一真相，不靠 IndexedDB 缓存） */
+  async function serverList(sub) {
+    const ws = window.SEWWS;
+    try {
+      const r = await fetch('api/ws/list?' + new URLSearchParams({ dir: sub }),
+        { cache: 'no-store', headers: (ws && ws._hdr()) || {} });
+      const j = await r.json();
+      return (j && j.files) || [];
+    } catch (e) {
+      console.warn('读取服务器工作区失败', sub, e);
+      return [];
+    }
+  }
+
+  function serverPath(sub, name) {
+    const ws = window.SEWWS;
+    const root = (ws && ws.server && ws.server.root) || '';
+    return String(root).replace(/\/+$/, '') + '/' + sub + '/' + name;
+  }
+
   function row(name, size, buttons) {
     const el = document.createElement('div');
     el.className = 'wsrow';
@@ -632,14 +627,34 @@
     }
   }
 
-  async function renderWorkspace() {
+  // 串行化：并发调用（例如刚下载完 + 别处触发）不会把列表渲染两遍
+  let renderChain = Promise.resolve();
+  function renderWorkspace() {
+    renderChain = renderChain
+      .then(() => renderWorkspaceNow())
+      .catch((e) => console.warn('renderWorkspace', e));
+    return renderChain;
+  }
+
+  async function renderWorkspaceNow() {
     const details = $('wsDetails');
     if (!details) return;
     details.classList.remove('hidden');
-    const [files, results] = await Promise.all([WS.all('files'),
-                                                WS.all('results')]);
-    const tpls = files.filter((x) => x.kind === KIND_TPL);
-    const fits = files.filter((x) => x.kind === KIND_FITS);
+    let tpls, fits, results;
+    if (computeOnServer()) {
+      // 服务器算力：模板/数据以 <root>/templates|data 为准，下载后刷新即出现
+      const [tf, df, rs] = await Promise.all([
+        serverList('templates'), serverList('data'), WS.all('results')]);
+      tpls = tf.map((f) => ({ name: f.name, size: f.size, kind: KIND_TPL }));
+      fits = df.map((f) => ({ name: f.name, size: f.size, kind: KIND_FITS,
+                              path: serverPath('data', f.name) }));
+      results = rs;
+    } else {
+      const files = await WS.all('files');
+      tpls = files.filter((x) => x.kind === KIND_TPL);
+      fits = files.filter((x) => x.kind === KIND_FITS);
+      results = await WS.all('results');
+    }
 
     const tl = $('wsTplList'); tl.innerHTML = '';
     tpls.forEach((r) => {
@@ -721,7 +736,8 @@
     emptyHint(rl);
 
     const st = $('wsStatus');
-    if (st) st.textContent = window.t ? t('ws.saved', { n: files.length + results.length }) : '';
+    if (st) st.textContent = window.t
+      ? t('ws.saved', { n: tpls.length + fits.length + results.length }) : '';
   }
 
   /* ================= 事件绑定 ================= */
