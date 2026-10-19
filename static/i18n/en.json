@@ -386,6 +386,7 @@
   "set.bridgeGo": "Connect",
   "set.bridgeOff": "Disconnect",
   "set.bridgeFail": "Cannot reach that address: the local bridge is not running, or the remote has no SEWweb",
+  "set.bridgeGet": "⤓ Download sew_bridge.py (single file, no dependencies)",
   "ws.unset": "Workspace: not set",
   "ws.unsetShort": "not set",
   "ws.unsetHint": "Workspace is not set yet. Click the SEWweb logo to choose a folder.",

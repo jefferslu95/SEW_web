@@ -759,6 +759,9 @@
             <button id="setBridgeGo" class="primary" data-i18n="set.bridgeGo"></button>
             <button id="setBridgeOff" class="ghost" data-i18n="set.bridgeOff"></button>
           </div>
+          <div class="small" style="margin-top:4px">
+            <a href="tools/sew_bridge.py" download data-i18n="set.bridgeGet"></a>
+          </div>
         </div>`;
     el.innerHTML = `
       <div class="wizard-box">

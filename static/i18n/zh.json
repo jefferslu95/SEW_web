@@ -386,6 +386,7 @@
   "set.bridgeGo": "连接",
   "set.bridgeOff": "断开",
   "set.bridgeFail": "连不上这个地址：本地桥没启动，或远端没有 SEWweb",
+  "set.bridgeGet": "⤓ 下载桥脚本 sew_bridge.py（单文件、无需安装依赖）",
   "ws.unset": "工作区：未设置",
   "ws.unsetShort": "未设置",
   "ws.unsetHint": "尚未设置工作区，请点左上角 SEWweb 图标选择目录。",
