@@ -33,12 +33,25 @@
     backend: 'browser',  // 'server' | 'local' | 'browser'
     compute: 'browser',  // 'server' = 服务器算力（不启动 Pyodide）
     _token: '',
+    apiBase: '',         // 本地桥地址，如 'http://127.0.0.1:8977'（空 = 同源）
     ready: null,         // Promise
     autoSaveVendor: true,
 
-    /* API 地址：永远与页面同源（页面在哪台服务器，算力/工作区就在那台） */
+    /* API 地址：默认与页面同源；配置了本地桥时指向桥（桥再经 SSH 转发到算力服务器） */
     apiUrl(p) {
-      return String(p || '').replace(/^\/+/, '');
+      const path = String(p || '').replace(/^\/+/, '');
+      const base = String(this.apiBase || '').replace(/\/+$/, '');
+      return base ? base + '/' + path : path;
+    },
+
+    /* 设置/清除本地桥地址（写入 localStorage，下次自动使用） */
+    setApiBase(url) {
+      this.apiBase = String(url || '').trim().replace(/\/+$/, '');
+      try {
+        if (this.apiBase) localStorage.setItem('sew.bridge', this.apiBase);
+        else localStorage.removeItem('sew.bridge');
+      } catch (e) { /* ignore */ }
+      return this.apiBase;
     },
 
     /* 是否走服务器算力（服务器工作区 + 后端声明 compute=server） */
@@ -736,6 +749,16 @@
             <button id="setOpfs" class="ghost" data-i18n="wiz.opfs"></button>
             <button id="setBrowser" class="ghost" data-i18n="wiz.skip"></button>
           </div>
+        </div>
+        <div class="set-sec">
+          <div class="set-h" data-i18n="set.bridge"></div>
+          <div class="small muted" data-i18n="set.bridgeHint"></div>
+          <div class="row" style="margin-top:6px">
+            <input id="setBridgeUrl" type="text" style="flex:1;min-width:0"
+                   placeholder="http://127.0.0.1:8977"/>
+            <button id="setBridgeGo" class="primary" data-i18n="set.bridgeGo"></button>
+            <button id="setBridgeOff" class="ghost" data-i18n="set.bridgeOff"></button>
+          </div>
         </div>`;
     el.innerHTML = `
       <div class="wizard-box">
@@ -769,7 +792,8 @@
         || (SEWWS.server && SEWWS.server.root) || '';
       const where = $('setSrvWhere');
       if (where) {
-        where.textContent = T('set.serverAt', { url: location.origin });
+        where.textContent = T('set.serverAt', {
+          url: SEWWS.apiBase || location.origin });
       }
 
       $('setSrvBrowse').onclick = () => {
@@ -806,6 +830,29 @@
       } catch (e) { /* 用户取消 */ }
     };
 
+    const bu = $('setBridgeUrl');
+    if (bu) {
+      bu.value = SEWWS.apiBase || '';
+      $('setBridgeGo').onclick = async () => {
+        const url = (bu.value || '').trim();
+        if (!url) return;
+        SEWWS.setApiBase(url);
+        const info = await SEWWS.detectServer();
+        if (!info) {
+          SEWWS.setApiBase('');
+          if (window.toast) window.toast(T('set.bridgeFail'), 'err');
+          return;
+        }
+        SEWWS.useServer(info);
+        await SEWWS.setPref('server');
+        location.reload();          // 算力归属变了：重载最干净
+      };
+      $('setBridgeOff').onclick = () => {
+        SEWWS.setApiBase('');
+        location.reload();
+      };
+    }
+
     $('setOpfs').onclick = async () => {
       try {
         await SEWWS.useOPFS();
@@ -828,6 +875,31 @@
     };
   }
   window.sewOpenSettings = openSettings;
+
+  // 本地桥地址（#bridge=... / ?bridge=... 或上次保存的值）：
+  // 必须在 preInit 之前确定，因为 detectServer() 靠 apiUrl() 判断后面有没有后端。
+  // 注：某些端口转发会改写 URL（连 '=' 都被编码成 %3D），所以这里做模糊解析。
+  function bridgeFromUrl() {
+    for (const raw of [location.hash, location.search]) {
+      if (!raw) continue;
+      let s = String(raw).replace(/^[#?]/, '');
+      try { s = decodeURIComponent(s); } catch (e) { /* 保留原样 */ }
+      const m = /(?:^|&)bridge=([^&]+)/.exec(s);
+      if (m) {
+        try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+      }
+    }
+    return '';
+  }
+
+  (function initBridge() {
+    try {
+      const q = bridgeFromUrl();
+      if (q) { SEWWS.setApiBase(q); return; }
+      const saved = localStorage.getItem('sew.bridge');
+      if (saved) SEWWS.apiBase = saved;
+    } catch (e) { /* ignore */ }
+  })();
 
   const preInitP = preInit();
   window.__sewPreInit = preInitP;   // 只包含 SW 注册 + 工作区探测（不等内核）

@@ -16,6 +16,7 @@
 import os
 import shutil
 import subprocess
+import time
 import sys
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,15 +31,28 @@ def asset_version():
     GitHub Pages 给 .js/.css 发 ``cache-control: max-age=600``；一旦 index.html
     先更新、而浏览器还在用缓存的旧 app.js，就会出现“按钮存在但点了没反应”。
     把所有资源引用改成 ``app.js?v=<commit>`` 即可避免。
+
+    本地开发时工作区可能有未提交改动（HEAD 不变），此时追加 ``-dev<时间戳>``，
+    否则改完代码重建后浏览器仍会命中旧缓存。
     """
+    ver = ""
     try:
-        out = subprocess.check_output(
+        ver = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=BASE, stderr=subprocess.DEVNULL).decode().strip()
-        if out:
-            return out
     except Exception:
-        pass
+        ver = ""
+    try:
+        dirty = subprocess.check_output(
+            ["git", "status", "--porcelain", "--", "static", "webapp/workspace.js",
+             "webapp/rpc.js"],
+            cwd=BASE, stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        dirty = ""
+    if dirty:
+        return (ver or "dev") + "-dev" + str(int(time.time()))
+    if ver:
+        return ver
     try:
         return str(int(max(
             os.path.getmtime(os.path.join(STATIC, f))
