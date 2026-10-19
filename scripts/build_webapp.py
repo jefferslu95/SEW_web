@@ -125,6 +125,19 @@ def copy_assets():
             json.dumps(data, ensure_ascii=False, indent=2))
         print("  templates/manifest.json（新建）")
 
+    # 清单里的 npz 是否真的在：缺了页面点下载就是 404
+    try:
+        import json as _json
+        ent = _json.load(open(man, encoding="utf-8")).get("templates") or []
+        miss = [e["file"] for e in ent
+                if not os.path.isfile(os.path.join(OUT, "templates", e["file"]))]
+        if miss:
+            print("⚠ 模板清单里这些文件缺失（页面下载会 404）："
+                  + ", ".join(miss))
+            print("  执行 python scripts/sync_templates.py --copy 补齐")
+    except Exception as e:
+        print(f"⚠ 无法校验模板清单：{e}")
+
 
 def main() -> int:
     os.makedirs(OUT, exist_ok=True)
