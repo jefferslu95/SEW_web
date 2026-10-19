@@ -29,16 +29,13 @@
     server: null,        // {root, writable, compute, ...} 服务器工作区
     backend: 'browser',  // 'server' | 'local' | 'browser'
     compute: 'browser',  // 'server' = 服务器算力（不启动 Pyodide）
-    apiBase: '',         // '' = 页面所在服务器；或 'http://127.0.0.1:8765'（SSH 算力服务器）
-    remoteError: '',     // 配置了算力服务器但连不上时的错误
     _token: '',
     ready: null,         // Promise
     autoSaveVendor: true,
 
-    /* API 地址：页面可能来自网页服务器（GitHub Pages），算力在另一台 SSH 服务器 */
+    /* API 地址：永远与页面同源（页面在哪台服务器，算力/工作区就在那台） */
     apiUrl(p) {
-      const s = String(p || '').replace(/^\/+/, '');
-      return this.apiBase ? this.apiBase.replace(/\/+$/, '') + '/' + s : s;
+      return String(p || '').replace(/^\/+/, '');
     },
 
     /* 是否走服务器算力（服务器工作区 + 后端声明 compute=server） */
@@ -52,9 +49,8 @@
     },
 
     /* ---------------- 服务器工作区 ---------------- */
-    async detectServer(base) {
-      const url = (base === undefined ? this.apiUrl('api/ws/info')
-        : (String(base || '').replace(/\/+$/, '') + '/api/ws/info'));
+    async detectServer() {
+      const url = this.apiUrl('api/ws/info');
       try {
         let r = await fetch(url, { cache: 'no-store', headers: this._hdr() });
         if (r.status === 401) {
@@ -70,10 +66,7 @@
         if (!j.ok) return null;
         this.server = j;
         return j;
-      } catch (e) {
-        this.remoteError = String((e && e.message) || e);
-        return null;
-      }
+      } catch (e) { return null; }
     },
 
     useServer(info) {
@@ -105,37 +98,6 @@
       this.useServer(info || { root: j.root, writable: true });
       await this.setPref('server');
       return this.server;
-    },
-
-    /* 连接 SSH 算力服务器（页面在网页服务器上时使用） */
-    async setRemote(url) {
-      const base = String(url || '').trim().replace(/\/+$/, '');
-      if (!base) throw new Error('需要填写算力服务器地址');
-      this.apiBase = base;
-      this.remoteError = '';
-      const info = await this.detectServer();
-      if (!info) {
-        const err = this.remoteError || T('set.remoteFail');
-        this.apiBase = '';
-        throw new Error(err);
-      }
-      this.useServer(info);
-      await this._metaPut('remoteUrl', base);
-      await this.setPref('server');
-      return this.server;
-    },
-
-    /* 断开算力服务器，回到本机（浏览器） */
-    async clearRemote() {
-      this.apiBase = '';
-      this.remoteError = '';
-      try { await this._metaPut('remoteUrl', ''); } catch (e) { /* ignore */ }
-      this.backend = 'browser';
-      this.compute = 'browser';
-      this.dir = null;
-      this.dirName = '';
-      this.server = null;
-      await this.setPref('browser');
     },
 
     async _srvPut(dir, name, blob) {
@@ -398,29 +360,14 @@
         ]);
       } catch (e) { console.warn('SW 注册失败', e); }
     }
-    // 1) 已配置的算力服务器（页面可能来自网页服务器，算力在另一台机器）
-    let remote = '';
-    try { remote = (await SEWWS._metaGet('remoteUrl')) || ''; } catch (e) { /* ignore */ }
-    if (remote) {
-      SEWWS.apiBase = String(remote).replace(/\/+$/, '');
-      SEWWS.remoteError = '';
-      const info = await SEWWS.detectServer();
-      if (info && info.writable) {
-        SEWWS.useServer(info);
-        return { restored: true, server: true, remote: true };
-      }
-      // 配置了但连不上：不静默回退到本地（否则算力/工作区跑到本机）
-      SEWWS.remoteError = SEWWS.remoteError || T('set.remoteFail');
-      SEWWS.backend = 'browser';
-      SEWWS.apiBase = '';
-      return { restored: true, server: false, remoteDown: true };
-    }
-    // 2) 页面由算力服务器直接提供（同源有 /api/ws/*）：工作区就是这台服务器的目录
+    // 1) 页面由带后端的服务器提供（同源有 /api/ws/*）：算力与工作区就在这台服务器。
+    //    这是唯一的“服务器模式”判定——不连接其他机器，也不让算力/工作区跑到访问者本机。
     const srv = await SEWWS.detectServer();
     if (srv && srv.writable) {
       SEWWS.useServer(srv);
       return { restored: true, server: true };
     }
+    // 2) 纯静态页面（无后端）：算力与工作区都在当前浏览器（同源本地）
     // 3) 上次选过的本地目录（未授权则等用户点按钮）
     let restored = false;
     try { restored = await SEWWS.restoreDir(true); } catch (e) { /* ignore */ }
@@ -716,9 +663,6 @@
             <button id="setSrvApply" class="primary" data-i18n="set.apply"></button>
           </div>
           <div id="setSrvWhere" class="small muted" style="margin-top:4px"></div>
-          <div class="row" style="margin-top:6px">
-            <button id="setSrvDisconnect" class="ghost small" data-i18n="set.disconnect"></button>
-          </div>
         </div>`
       : `
         <div class="set-sec">
@@ -729,16 +673,6 @@
             <button id="setOpfs" class="ghost" data-i18n="wiz.opfs"></button>
             <button id="setBrowser" class="ghost" data-i18n="wiz.skip"></button>
           </div>
-        </div>
-        <div class="set-sec">
-          <div class="set-h" data-i18n="set.remote"></div>
-          <div class="small muted" data-i18n="set.remoteHint"></div>
-          <div class="row" style="margin-top:6px">
-            <input id="setRemoteUrl" type="text" spellcheck="false"
-                   placeholder="http://127.0.0.1:8765" style="flex:1;min-width:0"/>
-            <button id="setRemoteGo" class="primary" data-i18n="set.connect"></button>
-          </div>
-          <div id="setRemoteMsg" class="small" style="color:#b45309;margin-top:4px"></div>
         </div>`;
     el.innerHTML = `
       <div class="wizard-box">
@@ -769,7 +703,7 @@
         || (SEWWS.server && SEWWS.server.root) || '';
       const where = $('setSrvWhere');
       if (where) {
-        where.textContent = T('set.serverAt', { url: SEWWS.apiBase || location.origin });
+        where.textContent = T('set.serverAt', { url: location.origin });
       }
 
       $('setSrvBrowse').onclick = () => {
@@ -793,40 +727,7 @@
           if (window.toast) window.toast(T('set.badRoot', { msg: e.message || e }), 'err');
         } finally { btn.disabled = false; }
       };
-
-      const dis = $('setSrvDisconnect');
-      if (dis) {
-        dis.onclick = async () => {
-          await SEWWS.clearRemote();
-          close();
-          location.reload();
-        };
-      }
       return;
-    }
-
-    // 浏览器宿主：可选连接 SSH 算力服务器
-    const rmsg = $('setRemoteMsg');
-    const rurl = $('setRemoteUrl');
-    if (rurl) {
-      try { rurl.value = (await SEWWS._metaGet('remoteUrl')) || ''; }
-      catch (e) { /* ignore */ }
-    }
-    if (rmsg && SEWWS.remoteError) rmsg.textContent = SEWWS.remoteError;
-    if ($('setRemoteGo')) {
-      $('setRemoteGo').onclick = async () => {
-        const u = (($('setRemoteUrl') || {}).value || '').trim();
-        if (!u) return;
-        const btn = $('setRemoteGo');
-        btn.disabled = true;
-        if (rmsg) rmsg.textContent = T('set.connecting');
-        try {
-          await SEWWS.setRemote(u);
-          location.reload();
-        } catch (e) {
-          if (rmsg) rmsg.textContent = String(e.message || e);
-        } finally { btn.disabled = false; }
-      };
     }
     $('setLocal').onclick = async () => {
       try {
@@ -868,12 +769,6 @@
   SEWWS.ready = preInitP.then(async (st) => {
     const restored = !!(st && st.restored);
     const serverMode = !!(st && st.server);
-    const remoteDown = !!(st && st.remoteDown);
-    // 连不上已配置的算力服务器：明确提示，不弹“选本机目录”的引导
-    if (remoteDown) {
-      if (window.toast) window.toast(SEWWS.remoteError || T('set.remoteFail'), 'err');
-      return;
-    }
     // 第一次进入（没有服务器工作区、没有已授权目录、且没选过“仅浏览器存储”）→ 弹引导
     let wantMirror = false;
     let skipped = false;

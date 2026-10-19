@@ -32,7 +32,7 @@ def main():
     ap.add_argument("--token", default=None,
                     help="服务器工作区口令（也可用 SEW_WORKSPACE_TOKEN）")
     ap.add_argument("--cors", default=None,
-                    help="允许的跨源来源（逗号分隔；默认 * 回显 Origin）")
+                    help="可选：允许的跨源来源（逗号分隔，默认不开放）")
     args = ap.parse_args()
 
     # 服务器工作区配置必须在导入 app 之前入环境

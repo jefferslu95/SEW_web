@@ -103,12 +103,11 @@ def _check_auth():
 
 
 # ---------------------------------------------------------------------------
-# 跨源访问：页面可能部署在别的网页服务器上（GitHub Pages 等），
-# 浏览器在这里打开的页面需要访问本服务器的 /api/*。
-#   SEW_CORS="*"                      -> 回显请求的 Origin（默认）
+# 可选跨源（默认关闭）：页面与后端不同源时才需要，例如把页面放在别的静态托管上。
+#   SEW_CORS="*"                      -> 回显请求的 Origin
 #   SEW_CORS="https://a.com,http://localhost:8080"
 # ---------------------------------------------------------------------------
-_CORS = os.environ.get("SEW_CORS", "*")
+_CORS = os.environ.get("SEW_CORS", "")
 
 
 def _cors_origin(origin: str) -> str:

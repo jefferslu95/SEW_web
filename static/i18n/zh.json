@@ -375,11 +375,5 @@
   "hdr.compute.loc": "算力：本浏览器 · 工作区：{root}",
   "collapse.title.ws": "展开 / 收起工作区",
   "set.staticHint": "当前页面是纯静态部署（{origin}），没有服务器后端：「选择工作目录」打开的是本计算机的目录。如需使用服务器上的目录，请访问那台服务器提供的页面（在服务器上运行 run.py 后打开它的地址）。",
-  "set.remote": "连接算力服务器（SSH）",
-  "set.remoteHint": "页面在网页服务器上、算力在另一台机器时：填那台机器的服务地址（例如 ssh -L 转发后的 http://127.0.0.1:8765），连上后工作区就是那台机器上的目录。",
-  "set.connect": "连接",
-  "set.connecting": "正在连接…",
-  "set.disconnect": "断开算力服务器",
-  "set.remoteFail": "无法连接算力服务器",
-  "set.serverAt": "算力服务器：{url}"
+  "set.serverAt": "本页面服务器：{url}"
 }

@@ -106,26 +106,6 @@ bash scripts/sim_remote.sh 8799        # 自动打包 + 解到 /tmp/sew-remote-s
 `work`（工作区），可用 `SEW_SIM_DIR` / `PYTHON` 覆盖。验证点：页面能加载、
 `compute=server`、浏览服务器目录、直接打开远端 FITS、拟合结果写进 `work/results/`。
 
-#### 变体：网页服务器部署页面 + SSH 服务器提供算力（两个服务器）
-
-页面在 GitHub Pages（或任意静态托管），算力与工作区在那台 SSH 服务器：
-
-```bash
-# SSH 服务器
-python run.py --root ~/sew-ws --port 8765      # 默认允许跨源（SEW_CORS=*）
-# 本地
-ssh -N -L 8765:127.0.0.1:8765 <user>@<server>
-```
-
-打开网页服务器上的页面 → 点左上角 **SEWweb 图标** → 「连接算力服务器（SSH）」→
-填 `http://127.0.0.1:8765` → 连接。连上后算力与工作区都在该服务器，
-设置面板只提供服务器目录（不会弹本机目录选择）。
-
-- `--cors "https://xxx.github.io,http://localhost:8080"` 可收窄允许的页面来源。
-- `--token 口令` 开启后，页面连接时需提供同一个口令（`X-SEW-Token`）。
-- `https://` 页面访问 `http://127.0.0.1` 可能受浏览器混合内容/私有网络策略限制，
-  必要时用 VS Code 提供的 https 端口转发地址（或 Cloudflare Tunnel 给后端一个 https 域名）。
-
 ### 方式 B：Cloudflare Tunnel（免费、临时公网域名）
 
 在跑服务的机器上：
