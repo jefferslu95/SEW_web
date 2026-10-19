@@ -8,3 +8,7 @@ server.log
 .env
 .DS_Store
 .ipynb_checkpoints/
+
+# 浏览器端：Pyodide 运行时 / 轮子 / 大模板，用 scripts/fetch_pyodide.py 生成
+webapp/vendor/
+webapp/templates/*.npz
