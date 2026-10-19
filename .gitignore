@@ -28,3 +28,4 @@ webapp/py/backend/binning.py
 
 # 部署包产物
 dist/
+webapp/tools/

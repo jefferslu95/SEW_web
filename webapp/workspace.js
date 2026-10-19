@@ -720,6 +720,15 @@
 
   async function openSettings() {
     srvWhenOpened = SEWWS.serverCompute();
+    // 后端刚起/隧道刚重建时可能有一两次瞬断，重试几次再判失败
+    const tryDetect = async (tries) => {
+      for (let i = 0; i < (tries || 3); i++) {
+        const info = await SEWWS.detectServer();
+        if (info) return info;
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      return null;
+    };
     const old = $('wsSettings');
     if (old) old.remove();
     const el = document.createElement('div');
@@ -916,7 +925,7 @@
           say(T('set.bridgeBusy'), false);
           const old = SEWWS.apiBase;
           SEWWS.setApiBase(url);
-          const info = await SEWWS.detectServer();
+          const info = await tryDetect(3);
           if (!info) {
             const why = (SEWWS._lastErr && (SEWWS._lastErr.message
               || String(SEWWS._lastErr))) || '';
@@ -936,7 +945,7 @@
         btn.textContent = T('set.bridgeBusy');
         say(T('set.bridgeBusy'), false);
         SEWWS.setApiBase(url);
-        const info = await SEWWS.detectServer();
+        const info = await tryDetect(3);
         btn.disabled = false;
         btn.textContent = label;
         if (!info) {
@@ -1025,7 +1034,7 @@
           sayDep(T('set.bridgeBusy'), false);
           openBtn.disabled = true;
           SEWWS.setApiBase(url);
-          const info = await SEWWS.detectServer();
+          const info = await tryDetect(3);
           openBtn.disabled = false;
           if (!info) {
             const why = (SEWWS._lastErr && (SEWWS._lastErr.message
