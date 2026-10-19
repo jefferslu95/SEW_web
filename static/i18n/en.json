@@ -367,5 +367,9 @@
   "set.apply": "Apply",
   "set.local": "Local / browser workspace",
   "set.changed": "Workspace switched",
-  "set.badRoot": "Cannot switch workspace: {msg}"
+  "set.badRoot": "Cannot switch workspace: {msg}",
+  "set.pickDir": "Choose a server folder",
+  "set.useThis": "Use this folder",
+  "set.browse": "Browse…",
+  "set.roots": "Allowed roots:"
 }

@@ -66,7 +66,8 @@ ssh -N -L 8791:127.0.0.1:8791 <user>@<服务器地址>
 - 模板、FITS、拟合结果都写在服务器的 `<root>/templates|results|data/`，
   模板库也优先读 `<root>/templates`。
 - 点左上角 **SEWweb 图标**打开「工作区设置」，可随时改服务器工作区路径
-  （`POST /api/ws/root`）。
+  （`POST /api/ws/root`）；面板里有 **「浏览…」目录树**：可在允许范围内逐级选目录、
+  点选快捷根，并显示当前 `--allow-root` 允许范围（越界时会提示完整范围）。
 - 想纯静态托管、算力仍在浏览器时，用 `server/workspace_server.py --root ...`
   （`compute=browser`，能力相同但打开 FITS 需先下载到内存）。
 

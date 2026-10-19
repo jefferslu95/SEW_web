@@ -120,12 +120,16 @@ def info() -> dict:
                 roots=[os.path.realpath(r) for r in Cfg.allow_roots])
 
 
+def _roots_hint() -> str:
+    return "（允许范围: " + ", ".join(Cfg.allow_roots) + "）"
+
+
 def set_root(new_root: str) -> dict:
     new_root = os.path.abspath(os.path.expanduser(str(new_root or "").strip()))
     if not new_root:
         raise ValueError("缺少 root")
     if not in_allow_roots(new_root):
-        raise PermissionError(f"不允许的目录: {new_root}")
+        raise PermissionError(f"不允许的目录: {new_root}" + _roots_hint())
     os.makedirs(new_root, exist_ok=True)
     Cfg.root = new_root
     ensure_dirs()
@@ -136,7 +140,7 @@ def browse(path: str = "") -> dict:
     target = os.path.abspath(os.path.expanduser(path)) if str(path or "").strip() \
         else Cfg.root
     if not in_allow_roots(target):
-        raise PermissionError(f"路径不在允许范围内: {target}")
+        raise PermissionError(f"路径不在允许范围内: {target}" + _roots_hint())
     if not os.path.isdir(target):
         raise FileNotFoundError(f"目录不存在: {target}")
     dirs, files = [], []

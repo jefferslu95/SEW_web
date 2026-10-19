@@ -542,7 +542,104 @@
     catch (e) { console.warn(e); }
     try { if (typeof afterBoot === 'function') await afterBoot(); }
     catch (e) { console.warn(e); }
+    // 状态栏跟着工作区走（服务器算力下这里显示"算力 · 工作区"）
+    if (SEWWS.serverCompute() && typeof window.setStatus === 'function') {
+      window.setStatus('服务器算力 · 工作区 ' + (SEWWS.dirName || ''));
+    }
     if (window.toast) window.toast(msg || T('set.changed'));
+  }
+
+  /* ---------------- 服务器目录浏览（选工作区用） ---------------- */
+  async function browseDirs(path) {
+    const r = await fetch('api/ws/browse?' +
+      new URLSearchParams({ path: path || '' }), { cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
+
+  function openDirPicker(start, onPick) {
+    const old = $('wsDirPicker');
+    if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'wsDirPicker';
+    el.className = 'modal';
+    el.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-head">
+          <h3>${T('set.pickDir')}</h3>
+          <button id="dpClose" class="ghost" data-i18n="modal.close"></button>
+        </div>
+        <div class="row">
+          <input id="dpPath" type="text" spellcheck="false"/>
+          <button id="dpGo" class="ghost" data-i18n="modal.go"></button>
+          <button id="dpUp" class="ghost" data-i18n="modal.up"></button>
+        </div>
+        <div id="dpRoots" class="small muted" style="margin-top:4px"></div>
+        <div id="dpMsg" class="small" style="color:#b45309;margin-top:2px"></div>
+        <div class="browselist"><div id="dpDirs"></div></div>
+        <div class="wiz-foot" style="display:flex;gap:8px;margin-top:8px">
+          <button id="dpPick" class="primary" data-i18n="set.useThis"></button>
+          <button id="dpCancel" class="ghost" data-i18n="modal.close"></button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    if (window.applyI18N) window.applyI18N(el);
+
+    const shown = { path: '' };
+    const close = () => el.remove();
+    $('dpClose').onclick = close;
+    $('dpCancel').onclick = close;
+    el.addEventListener('click', (e) => { if (e.target === el) close(); });
+
+    const render = async (path) => {
+      $('dpMsg').textContent = '';
+      try {
+        const j = await browseDirs(path);
+        shown.path = j.path;
+        $('dpPath').value = j.path;
+        const roots = $('dpRoots');
+        roots.innerHTML = '';
+        (j.roots || []).forEach((rp) => {
+          const b = document.createElement('button');
+          b.className = 'ghost';
+          b.style.marginRight = '6px';
+          b.textContent = rp;
+          b.onclick = () => render(rp);
+          roots.appendChild(b);
+        });
+        const box = $('dpDirs');
+        box.innerHTML = '';
+        if (!j.dirs.length) {
+          box.innerHTML = `<div class="item muted">${T('ws.empty')}</div>`;
+        }
+        j.dirs.forEach((d) => {
+          const it = document.createElement('div');
+          it.className = 'item dir';
+          it.textContent = '\u{1F4C1} ' + d.name;
+          it.onclick = () => render(d.path);
+          box.appendChild(it);
+        });
+      } catch (e) {
+        $('dpMsg').textContent = String(e.message || e);
+      }
+    };
+    $('dpGo').onclick = () => render($('dpPath').value.trim());
+    $('dpPath').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') render($('dpPath').value.trim());
+    });
+    $('dpUp').onclick = async () => {
+      if (!shown.path) return;
+      const parent = shown.path.replace(/\/+$/, '').replace(/\/[^/]+$/, '') || '/';
+      render(parent);
+    };
+    $('dpPick').onclick = () => {
+      const p = ($('dpPath').value || shown.path || '').trim();
+      if (!p) return;
+      close();
+      onPick(p);
+    };
+    render(start || '');
   }
 
   function openSettings() {
@@ -562,8 +659,10 @@
           <div class="small muted" data-i18n="set.serverHint"></div>
           <div class="row" style="margin-top:6px">
             <input id="setSrvPath" type="text" style="flex:1;min-width:0"/>
+            <button id="setSrvBrowse" class="ghost" data-i18n="set.browse"></button>
             <button id="setSrvApply" class="primary" data-i18n="set.apply"></button>
           </div>
+          <div id="setRoots" class="small muted" style="margin-top:4px"></div>
         </div>
         <div class="set-sec">
           <div class="set-h" data-i18n="set.local"></div>
@@ -585,6 +684,19 @@
     paint();
     $('setSrvPath').value = (SEWWS.backend === 'server' && SEWWS.dirName)
       || (SEWWS.server && SEWWS.server.root) || '';
+    // 允许范围（后端 --allow-root / SEW_WS_ALLOW），直接告诉用户为什么会被拒
+    const rootBox = $('setRoots');
+    const roots = (SEWWS.server && SEWWS.server.roots) || [];
+    if (rootBox) {
+      rootBox.textContent = roots.length
+        ? T('set.roots') + ' ' + roots.join('  ·  ') : '';
+    }
+
+    $('setSrvBrowse').onclick = () => {
+      const start = ($('setSrvPath').value || '').trim()
+        || (roots.length ? roots[0] : '');
+      openDirPicker(start, (p) => { $('setSrvPath').value = p; });
+    };
 
     const close = () => el.remove();
     $('setClose').onclick = close;

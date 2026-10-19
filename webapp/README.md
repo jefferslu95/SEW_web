@@ -82,7 +82,8 @@ ssh -N -L 8791:127.0.0.1:8791 user@server
   本地拷贝到 `<root>/templates/`，不依赖外网，也不用事先装 ppxf_sew 自带模板。
 - **`浏览` 列的是服务器端目录**（`/api/ws/browse`，限制在 `--allow-root` 内），
   选中 FITS 后只把**路径**发给后端，不传输文件内容。
-- **切换工作区**：点左上角 **SEWweb 图标** → 「工作区设置」面板 → 填服务器目录 → 应用
+- **切换工作区**：点左上角 **SEWweb 图标** → 「工作区设置」面板 → 填服务器目录（或点
+  **浏览…** 在允许范围内逐级选目录，面板会显示 `--allow-root` 允许范围）→ 应用
   （POST `/api/ws/root`，会做 `--allow-root` 校验并自动 `mkdir`）。同一面板也能切回
   本地目录 / OPFS / 仅浏览器存储（切回去就用浏览器算力）。
 - 接口：`GET /api/ws/info|browse|file|list|get`，`POST /api/ws/root|put`，`DELETE /api/ws/delete`。

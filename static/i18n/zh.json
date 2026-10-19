@@ -367,5 +367,9 @@
   "set.apply": "应用",
   "set.local": "本地 / 浏览器工作区",
   "set.changed": "工作区已切换",
-  "set.badRoot": "无法切换工作区：{msg}"
+  "set.badRoot": "无法切换工作区：{msg}",
+  "set.pickDir": "选择服务器目录",
+  "set.useThis": "使用此目录",
+  "set.browse": "浏览…",
+  "set.roots": "允许范围："
 }
