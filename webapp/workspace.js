@@ -214,19 +214,51 @@
     },
 
     async _dir(sub, create) {
-      if (!this.dir) throw new Error('未设置工作区');
-      return this.dir.getDirectoryHandle(sub, { create: create !== false });
+      if (!this.dir) throw new Error(T('ws.noDir'));
+      try {
+        return await this.dir.getDirectoryHandle(sub, { create: create !== false });
+      } catch (e) {
+        throw this._mapErr(e);
+      }
+    },
+
+    /* 把浏览器原生的权限类报错换成可操作的中文/英文提示 */
+    _mapErr(e) {
+      if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
+        return new Error(T('ws.permDenied'));
+      }
+      return (e instanceof Error) ? e : new Error(String(e));
+    },
+
+    /* 写目录前确认权限：granted 直接用；prompt 则尝试申请（需用户手势） */
+    async _ensureWritable() {
+      if (!this.dir) throw new Error(T('ws.noDir'));
+      let q = 'prompt';
+      try { q = await this.dir.queryPermission({ mode: 'readwrite' }); } catch (e) { /* ignore */ }
+      if (q === 'granted') return true;
+      if (q === 'prompt') {
+        try {
+          const r = await this.dir.requestPermission({ mode: 'readwrite' });
+          if (r === 'granted') return true;
+        } catch (e) { /* 无用户手势时浏览器会拒绝 */ }
+      }
+      throw new Error(T('ws.permDenied'));
     },
 
     /* ---------------- 文件读写 ---------------- */
     async writeFile(sub, name, blob) {
       if (this.backend === 'server') return this._srvPut(sub, name, blob);
       if (!this.dir) return false;
+      await this._ensureWritable();
       const d = (sub === '.' || !sub) ? this.dir : await this._dir(sub);
-      const fh = await d.getFileHandle(name, { create: true });
-      const w = await fh.createWritable();
-      await w.write(blob);
-      await w.close();
+      try {
+        const fh = await d.getFileHandle(name, { create: true });
+        const w = await fh.createWritable();
+        await w.write(blob);
+        await w.close();
+      } catch (e) {
+        throw this._mapErr(e);
+      }
       return true;
     },
 
@@ -287,27 +319,36 @@
 
     /* 把缓存里的依赖镜像到 <workdir>/cache/vendor/**（可跨浏览器长期保存） */
     async mirrorVendorToDir(onProgress) {
-      if (!this.dir) return { ok: false, reason: 'no-dir' };
+      if (!this.dir) return { ok: false, reason: 'no-dir', error: T('ws.noDir') };
+      try {
+        await this._ensureWritable();
+      } catch (e) {
+        return { ok: false, reason: 'no-perm', error: String(e.message || e) };
+      }
       const urls = await this._vendorList();
       if (!urls) return { ok: false, reason: 'no-manifest' };
       const cache = await caches.open('sew-vendor-v1');
       let n = 0;
-      for (const u of urls) {
-        const res = await cache.match(u);
-        if (!res) continue;
-        const rel = decodeURIComponent(new URL(u).pathname)
-          .replace(/^.*?\/vendor\//, '');
-        const parts = rel.split('/');
-        let dir = await this._dir('cache');
-        for (const p of parts.slice(0, -1)) {
-          dir = await dir.getDirectoryHandle(p, { create: true });
+      try {
+        for (const u of urls) {
+          const res = await cache.match(u);
+          if (!res) continue;
+          const rel = decodeURIComponent(new URL(u).pathname)
+            .replace(/^.*?\/vendor\//, '');
+          const parts = rel.split('/');
+          let dir = await this._dir('cache');
+          for (const p of parts.slice(0, -1)) {
+            dir = await dir.getDirectoryHandle(p, { create: true });
+          }
+          const fh = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+          const w = await fh.createWritable();
+          await w.write(await res.blob());
+          await w.close();
+          n++;
+          if (onProgress && n % 5 === 0) onProgress(n, urls.length);
         }
-        const fh = await dir.getFileHandle(parts[parts.length - 1], { create: true });
-        const w = await fh.createWritable();
-        await w.write(await res.blob());
-        await w.close();
-        n++;
-        if (onProgress && n % 5 === 0) onProgress(n, urls.length);
+      } catch (e) {
+        return { ok: false, reason: 'write-failed', error: String(this._mapErr(e).message) };
       }
       return { ok: true, written: n, total: urls.length };
     },
@@ -524,6 +565,11 @@
           const m = await SEWWS.mirrorVendorToDir((n, total) => {
             btn.textContent = `${n}/${total}`;
           });
+          if (!m.ok) {
+            btn.textContent = T('ws.cacheFail');
+            if (window.toast) window.toast(m.error || T('ws.cacheFail'), 'err');
+            return;
+          }
           btn.textContent = T('ws.cached');
           if (window.toast) {
             window.toast(T('ws.cacheDone', { n: m.written || (p && p.added) || 0 }));
@@ -818,6 +864,8 @@
     if (wantMirror && SEWWS.dir) {
       setTimeout(async () => {
         try {
+          // 无用户手势：只在权限已授权时自动镜像，否则等用户主动点按钮
+          if (!(await SEWWS._perm(SEWWS.dir, false))) return;
           await SEWWS.primeVendorCache();
           await SEWWS.mirrorVendorToDir();
         } catch (e) { console.warn(e); }
