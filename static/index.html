@@ -50,7 +50,7 @@
         <label data-i18n="data.obsVac" data-i18n-title="data.obsVac.title"></label>
         <select id="obsVacSel">
           <option value="air" data-i18n="data.air"></option>
-          <option value="vacuum" data-i18n="data.vacuum"></option>
+          <option value="vacuum" selected data-i18n="data.vacuum"></option>
         </select>
       </div>
 
@@ -355,8 +355,8 @@
         <div class="span2"><input class="rngsingle" type="range" id="zR"/></div>
         <label data-i18n="fit.dlam"></label>
         <select id="dlamModeSel" data-i18n-title="fit.dlam.title">
-          <option value="template" selected data-i18n="fit.dlam.template"></option>
-          <option value="obs" data-i18n="fit.dlam.obs"></option>
+          <option value="obs" selected data-i18n="fit.dlam.obs"></option>
+          <option value="template" data-i18n="fit.dlam.template"></option>
           <option value="custom" data-i18n="fit.dlam.custom"></option>
         </select>
         <div id="dlamCustomRow" class="span2" style="display:none">

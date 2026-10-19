@@ -557,7 +557,7 @@ def _parabolic(y, j):
 
 def estimate_redshift(wave, flux, template_path=None,
                       z_range=(-0.01, 0.2), velscale=None,
-                      obs_vacuum="air", template_vacuum="air",
+                      obs_vacuum="vacuum", template_vacuum="air",
                       progress=None):
     """用恒星模板 + 发射线模板互相关估计系统红移。
 
@@ -565,7 +565,7 @@ def estimate_redshift(wave, flux, template_path=None,
     """
     from scipy.signal import correlate
     wave = np.asarray(wave, float)
-    _obs_vac = str(obs_vacuum or "air").lower().startswith("vac")
+    _obs_vac = str(obs_vacuum or "vacuum").lower().startswith("vac")
     _tpl_vac = str(template_vacuum or "air").lower().startswith("vac")
     # 拟合/互相关统一到 vacuum 网格
     wave, _ = align_wave_system(wave, _obs_vac)
@@ -781,6 +781,36 @@ def template_dlam(path, lam_lo=None, lam_hi=None):
     return float(d)
 
 
+# ---------------------------------------------------------------------------
+# 单线程（兜底）
+#   主保证在 import numpy 之前（backend/__init__.py、run.py 都直接赋值 env，
+#   同 DGIS/cube.ipynb 的 import 格）；这里再兜一道：
+#     · env 再写一遍（对尚未初始化的库仍有效）
+#     · threadpoolctl 把已加载的 BLAS/OpenMP 线程池限到 1
+#         （浏览器版 Pyodide 没有 run.py，靠这条才生效；没装该包时无害）
+#   将来加数据立方的批量拟合时：并行放到**任务层**（多进程，每进程一套 env +
+#   threadpoolctl，同 notebook 的 _pbcf_worker_init），进程内部依旧单线程。
+# ---------------------------------------------------------------------------
+_THREADS_LIMITED = [False]
+_TP_CTL = [None]          # ★ 必须持有引用：threadpool_limits 对象被 GC 后会【恢复】原线程数
+_THREAD_ENV = {"OMP_NUM_THREADS": "1", "OPENBLAS64_NUM_THREADS": "1",
+               "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
+               "VECLIB_MAXIMUM_THREADS": "1", "NUMEXPR_NUM_THREADS": "1"}
+
+
+def _limit_threads_once():
+    if _THREADS_LIMITED[0]:
+        return
+    _THREADS_LIMITED[0] = True
+    for k, v in _THREAD_ENV.items():
+        os.environ[k] = v
+    try:
+        from threadpoolctl import threadpool_limits
+        _TP_CTL[0] = threadpool_limits(limits=1)
+    except Exception:          # 没装 threadpoolctl 时无害
+        pass
+
+
 def run_fit(wave, flux, var, badmask, cfg, template_info,
             progress=None, log=None):
     """执行一次拟合。
@@ -792,6 +822,7 @@ def run_fit(wave, flux, var, badmask, cfg, template_info,
     返回 JSON 友好 dict。
     """
     t0 = time.time()
+    _limit_threads_once()
     msgs = []
     log_i18n = []          # 与 msgs 一一对应：[key, args] 或 None
 
@@ -844,7 +875,7 @@ def run_fit(wave, flux, var, badmask, cfg, template_info,
         raise ValueError("拟合波段内有效像素 < 50（掩膜过多）")
 
     # --- 波长系对齐：拟合统一在 vacuum 网格 ---
-    _obs_vac = str(cfg.get("obs_vacuum", "air") or "air").lower() \
+    _obs_vac = str(cfg.get("obs_vacuum", "vacuum") or "vacuum").lower() \
         .startswith("vac")
     w, _ws = align_wave_system(w, _obs_vac)
     _wave_system = "观测 " + ("vacuum" if _obs_vac else "air") + " → 拟合 vacuum"
@@ -852,10 +883,10 @@ def run_fit(wave, flux, var, badmask, cfg, template_info,
         _log(_ws, key="wavesys")
 
     # --- 速度网格 dlam（dex/px）→ velscale = c·ln10·dlam ---
-    #   template：跟模板自身的波长采样一致（默认，不无谓过采样）
-    #   obs     ：跟观测谱的采样一致
+    #   obs     ：跟观测谱的采样一致（默认，不无谓过采样也不丢分辨率）
+    #   template：跟模板自身的波长采样一致
     #   custom  ：用户给定
-    dlam_mode = str(cfg.get("dlam_mode") or "template").lower()
+    dlam_mode = str(cfg.get("dlam_mode") or "obs").lower()
     dlam_obs = (float(np.median(np.diff(w) / w[:-1]) / math.log(10.0))
                 if w.size > 2 else 1e-4)
     # 观测谱是否已经是均匀 log 网格（Δlnλ 恒定）？

@@ -2224,7 +2224,7 @@ async function autoRedshift() {
       bin: useBin() ? S.target.bin : null,
       aperture: useBin() ? 0 : apPix(),
       template: $('templateSel').value,
-      obs_vacuum: $('obsVacSel') ? $('obsVacSel').value : 'air',
+      obs_vacuum: $('obsVacSel') ? $('obsVacSel').value : 'vacuum',
       template_vacuum: $('tplVacSel').value,
       z_range: [-0.01, 0.2],
     });
@@ -2384,7 +2384,7 @@ function renderResult(r, target) {
       (r.redshift ? ` (${r.redshift.method})` : '')],
     ['FWHM', r.fwhm.text],
     [t('r.wavesys'), (() => {
-      const ov = $('obsVacSel') ? $('obsVacSel').value : 'air';
+      const ov = $('obsVacSel') ? $('obsVacSel').value : 'vacuum';
       return t('r.wavesys.v', { obs: t(ov === 'vacuum' ? 'data.vacuum' : 'data.air') });
     })()],
     [t('r.velscale'), r.velscale != null

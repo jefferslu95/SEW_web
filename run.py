@@ -16,6 +16,18 @@ import sys
 import threading
 import webbrowser
 
+# 拟合一律单线程：ppxf 每次迭代都是小矩阵乘，多线程收益为负，还会与并行任务抢核。
+# ★ 必须在 import numpy/scipy（OpenBLAS 首次初始化）之前【直接赋值】—— OpenBLAS
+#   只在此刻读线程数，之后改 env 无效（同 DGIS/cube.ipynb）。
+#   将来做数据立方的批量拟合时，并行放到「任务层」（多进程），进程内仍单线程。
+for _k, _v in {"OMP_NUM_THREADS": "1",
+               "OPENBLAS64_NUM_THREADS": "1",
+               "OPENBLAS_NUM_THREADS": "1",
+               "MKL_NUM_THREADS": "1",
+               "VECLIB_MAXIMUM_THREADS": "1",
+               "NUMEXPR_NUM_THREADS": "1"}.items():
+    os.environ[_k] = _v
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)

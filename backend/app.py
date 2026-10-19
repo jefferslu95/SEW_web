@@ -675,7 +675,7 @@ def redshift():
         out = fitting.estimate_redshift(
             sp["wave"], sp["flux"],
             template_path=(tinfo or {}).get("path"), z_range=tuple(zr),
-            obs_vacuum=body.get("obs_vacuum", "air"),
+            obs_vacuum=body.get("obs_vacuum", "vacuum"),
             template_vacuum=body.get("template_vacuum", "air"))
         return jsonify(ok=True, **_json_clean(out))
     except Exception as e:
