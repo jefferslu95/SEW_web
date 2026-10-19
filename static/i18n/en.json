@@ -163,6 +163,7 @@
   "modal.go": "Go",
   "modal.up": "Up",
   "modal.empty": "No FITS files in this directory",
+  "modal.pickLocal": "Choose a file on this computer…",
   "status.backend": "Backend not ready: {msg}",
   "status.loading": "Loading…",
   "status.loaded": "Loaded {name} ({kind})",

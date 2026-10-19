@@ -163,6 +163,7 @@
   "modal.go": "前往",
   "modal.up": "上一级",
   "modal.empty": "此目录没有 FITS 文件",
+  "modal.pickLocal": "从本机选择文件…",
   "status.backend": "后端未就绪: {msg}",
   "status.loading": "加载中…",
   "status.loaded": "已加载 {name} ({kind})",

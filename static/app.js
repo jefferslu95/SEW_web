@@ -399,6 +399,15 @@ function bindEvents() {
   $('browsePath').addEventListener('keydown', e => {
     if (e.key === 'Enter') openBrowse($('browsePath').value.trim());
   });
+  // 浏览器模式下没有可浏览的服务器路径：给个系统文件对话框，可选任意本机文件
+  const browseLocalBtn = $('browseLocal');
+  if (browseLocalBtn) {
+    browseLocalBtn.onclick = () => {
+      S._browsePick = null;
+      $('browseModal').classList.add('hidden');
+      $('fileInput').click();
+    };
+  }
 
   // 地图点击
   $('mapCanvas').onclick = onMapClick;
@@ -1078,6 +1087,12 @@ async function openBrowse(path, pick) {
     S._browseParent = j.parent;
     $('browseModal').classList.remove('hidden');
     $('browsePath').value = j.path;
+    // 静态页（浏览器算力）下只能浏览工作区，另给“从本机选择文件”入口
+    const lb = $('browseLocal');
+    if (lb) {
+      const isServer = !!(window.SEWWS && window.SEWWS.serverCompute());
+      lb.style.display = (isServer || S._browsePick) ? 'none' : '';
+    }
     const dirs = $('browseDirs'), files = $('browseFiles');
     dirs.innerHTML = ''; files.innerHTML = '';
     j.dirs.forEach(d => {
