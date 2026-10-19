@@ -22,12 +22,34 @@ from flask import (Flask, Response, jsonify, request, send_from_directory,
 from werkzeug.utils import secure_filename
 
 from . import fits_io, templates, fitting
+from . import workspace as wsmod
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+WEBAPP_DIR = os.path.join(BASE_DIR, "webapp")   # build_webapp.py 产物
 DATA_DIR = os.path.join(BASE_DIR, "data")
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _page_dir() -> str:
+    """优先用组装好的 webapp/（带 workspace.js / rpc.js 工作区能力）。"""
+    if os.path.isfile(os.path.join(WEBAPP_DIR, "index.html")):
+        return WEBAPP_DIR
+    return STATIC_DIR
+
+# 服务器工作区：默认 ~/sew-workspace；可用 SEW_WS_ROOT / SEW_WS_ALLOW 覆盖
+wsmod.init(root=os.environ.get("SEW_WS_ROOT") or None,
+           allow_roots=[p for p in (os.environ.get("SEW_WS_ALLOW") or "")
+                        .split(os.pathsep) if p.strip()] or None,
+           token=os.environ.get("SEW_WORKSPACE_TOKEN") or "",
+           compute="server")
+# 模板库优先读工作区 <root>/templates（随 /api/ws/root 切换动态生效）
+templates.set_runtime_dir(os.path.join(wsmod.Cfg.root, "templates"))
+try:
+    wsmod.ensure_dirs()
+except OSError:
+    pass
 
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024 * 1024   # 4 GB
@@ -64,6 +86,14 @@ def _in_roots(path: str) -> bool:
 
 @app.before_request
 def _check_auth():
+    # 服务器工作区接口：可选口令（X-SEW-Token）
+    if request.path.startswith("/api/ws/"):
+        tk = wsmod.Cfg.token
+        if tk:
+            got = request.headers.get("X-SEW-Token") or request.args.get("token") or ""
+            if got != tk:
+                return jsonify(dict(ok=False, error="令牌无效")), 401
+        return None
     if _AUTH_PAIR is None:
         return None
     a = request.authorization
@@ -71,6 +101,105 @@ def _check_auth():
         return Response("authentication required", 401,
                         {"WWW-Authenticate": 'Basic realm="SEW web"'})
     return None
+
+
+# ---------------------------------------------------------------------------
+# 服务器工作区（templates / results / data）
+#   计算本来就在服务器上，这里只补「工作区落在服务器目录」的能力：
+#   /api/ws/info|browse|file|list|get  /  /api/ws/root|put  /  /api/ws/delete
+# ---------------------------------------------------------------------------
+def _ws_err(e):
+    code = 404 if isinstance(e, FileNotFoundError) else 403 \
+        if isinstance(e, PermissionError) else 400
+    return jsonify(dict(ok=False, error=str(e))), code
+
+
+@app.route("/api/ws/info")
+def ws_info():
+    try:
+        return jsonify(wsmod.info())
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/browse")
+def ws_browse():
+    try:
+        return jsonify(wsmod.browse(request.args.get("path", "")))
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/file")
+def ws_file():
+    try:
+        p = os.path.abspath(os.path.expanduser(request.args.get("path", "")))
+        if not wsmod.in_allow_roots(p):
+            raise PermissionError("路径不在允许范围内")
+        if not os.path.isfile(p):
+            raise FileNotFoundError("文件不存在")
+        return send_file(p, mimetype="application/octet-stream",
+                         as_attachment=False, download_name=os.path.basename(p))
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/list")
+def ws_list():
+    try:
+        return jsonify(wsmod.list_dir(request.args.get("dir", "")))
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/get")
+def ws_get():
+    try:
+        p = wsmod.resolve_file(request.args.get("dir", ""),
+                               request.args.get("name", ""))
+        return send_file(p, mimetype="application/octet-stream",
+                         as_attachment=False, download_name=os.path.basename(p))
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/root", methods=["POST"])
+def ws_root():
+    try:
+        body = request.get_json(silent=True) or {}
+        new_root = body.get("root") or request.args.get("root", "")
+        wsmod.set_root(new_root)
+        # 模板库跟着走
+        templates.set_runtime_dir(os.path.join(wsmod.Cfg.root, "templates"))
+        return jsonify(wsmod.info())
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/put", methods=["POST"])
+def ws_put():
+    try:
+        d = request.args.get("dir", "")
+        name = request.args.get("name", "")
+        length = int(request.headers.get("Content-Length") or 0)
+        out = wsmod.write_stream(d, name,
+                                 lambda n: request.stream.read(n), length)
+        if str(d).strip("/") == "templates":
+            templates.set_runtime_dir(os.path.join(wsmod.Cfg.root, "templates"))
+        return jsonify(out)
+    except Exception as e:
+        return _ws_err(e)
+
+
+@app.route("/api/ws/delete", methods=["DELETE", "POST"])
+def ws_delete():
+    try:
+        d = request.args.get("dir", "")
+        name = request.args.get("name", "")
+        return jsonify(wsmod.delete_file(d, name))
+    except Exception as e:
+        return _ws_err(e)
+
 
 # S/N 参考波段（观测系，Å）：与 PowerBin 分 bin 的估算波段保持一致
 SNR_BAND = (5300.0, 5700.0)
@@ -128,12 +257,19 @@ def _json_clean(o):
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return send_from_directory(STATIC_DIR, "index.html")
+    return send_from_directory(_page_dir(), "index.html")
 
 
 @app.route("/static/<path:fn>")
 def static_file(fn):
     return send_from_directory(STATIC_DIR, fn)
+
+
+@app.route("/templates/<path:fn>")
+def wasm_templates(fn):
+    """浏览器端版本的模板目录（服务器需要下载模板时也走这里）。"""
+    d = os.path.join(BASE_DIR, "webapp", "templates")
+    return send_from_directory(d, fn)
 
 
 @app.route("/vendor/plotly.min.js")
@@ -678,6 +814,20 @@ def fit_export(jid):
 @app.errorhandler(413)
 def too_large(e):
     return _err("上传文件超过 4 GB 限制", 413)
+
+
+# ---------------------------------------------------------------------------
+# 兜底静态文件：webapp/ 构建产物（app.js / i18n.js / workspace.js / rpc.js …）
+# 放在最后注册，避免抢占 /api/* 等具体路由。
+# ---------------------------------------------------------------------------
+@app.route("/<path:fn>")
+def _fallback_static(fn):
+    d = _page_dir()
+    if os.path.isfile(os.path.join(d, fn)):
+        return send_from_directory(d, fn)
+    if d != STATIC_DIR and os.path.isfile(os.path.join(STATIC_DIR, fn)):
+        return send_from_directory(STATIC_DIR, fn)
+    return _err(f"找不到 {fn}", 404)
 
 
 def create_app():

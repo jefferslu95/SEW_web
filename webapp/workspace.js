@@ -26,11 +26,18 @@
     supported: FS_SUPPORTED,
     dir: null,           // FileSystemDirectoryHandle（本地目录 / OPFS）
     dirName: '',
-    server: null,        // {root, writable, ...} 服务器工作区
+    server: null,        // {root, writable, compute, ...} 服务器工作区
     backend: 'browser',  // 'server' | 'local' | 'browser'
+    compute: 'browser',  // 'server' = 服务器算力（不启动 Pyodide）
     _token: '',
     ready: null,         // Promise
     autoSaveVendor: true,
+
+    /* 是否走服务器算力（服务器工作区 + 后端声明 compute=server） */
+    serverCompute() {
+      return this.backend === 'server'
+        && ((this.server && this.server.compute) || 'browser') === 'server';
+    },
 
     _hdr(extra) {
       return Object.assign({ 'X-SEW-Token': this._token || '' }, extra || {});
@@ -60,6 +67,7 @@
       this.server = info || this.server;
       if (!this.server) throw new Error('没有可用的服务器工作区');
       this.backend = 'server';
+      this.compute = this.server.compute || 'browser';
       this.dir = null;
       this.dirName = this.server.root;
       return this.server;
@@ -523,7 +531,13 @@
     return T('ws.dirNone');
   }
 
+  let srvWhenOpened = null;   // 打开设置面板时的算力归属（用于判断是否需要重载）
   async function refreshAfterSwitch(msg) {
+    // 算力归属变了（服务器 ↔ 浏览器）：Pyodide 内核启停状态不同，整页重载最干净
+    if (srvWhenOpened !== null && SEWWS.serverCompute() !== srvWhenOpened) {
+      location.reload();
+      return;
+    }
     try { if (window.sewRescanWorkspace) await window.sewRescanWorkspace(); }
     catch (e) { console.warn(e); }
     try { if (typeof afterBoot === 'function') await afterBoot(); }
@@ -532,6 +546,7 @@
   }
 
   function openSettings() {
+    srvWhenOpened = SEWWS.serverCompute();
     const old = $('wsSettings');
     if (old) old.remove();
     const el = document.createElement('div');

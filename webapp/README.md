@@ -52,25 +52,49 @@ python -m http.server 8790 --directory webapp
 
 ## 服务器工作区模式（SSH 转发 / 团队共用同一台机器）
 
-用 SSH 端口转发访问时，工作区应该落在**服务器**而不是访问者本地：
+**算力归属规则**：工作区在哪里，就用那里的算力。
+
+| 工作区 | 算力 | 打开 FITS |
+|---|---|---|
+| 服务器（`run.py --root ...`） | **服务器**（Flask 直接读文件跑 ppxf） | 零下载，只把路径发给后端 |
+| 服务器静态托管（`server/workspace_server.py`） | 浏览器（Pyodide） | 按需流式下载到内存 FS |
+| 本地目录 / 浏览器存储 | 浏览器（Pyodide） | 本地文件 |
+
+前端通过 `/api/ws/info` 的 `compute` 字段判定：`compute=server` 时**完全不启动 Pyodide**
+（不下载 57 MB 运行时），所有 `/api/*` 直接打后端。
+
+### 推荐：`run.py`（服务器算力 + 服务器文件）
 
 ```bash
-# 服务器上（纯标准库，无需 Flask）
-python server/workspace_server.py --root ~/sew-ws --port 8791 \
+# 服务器上
+python run.py --root ~/sew-ws --port 8791 \
     --allow-root ~ --allow-root /data
-# 本地（可选）ssh -N -L 8791:127.0.0.1:8791 user@server
+# 本地
+ssh -N -L 8791:127.0.0.1:8791 user@server
+# 打开 http://127.0.0.1:8791/
 ```
 
-- 启动参数：`--root` 初始工作区；`--allow-root`（可多次）限定可切换/可浏览的目录范围，
+- `--root` 初始工作区；`--allow-root`（可多次）限定可切换/可浏览的目录范围，
   不传时默认 `[--root, $HOME]`；`--token` 可给 `/api/ws/*` 加 `X-SEW-Token` 校验。
-- 页面会自动探测 `/api/ws/info`；成功即进入「服务器工作区」模式：模板、FITS、结果都写在
-  服务器目录的 `templates/ results/ data/` 下（写入走 `<name>.part` → `os.replace`，不产生半截文件）。
-- **`浏览` 列的是服务器端目录**（`/api/ws/browse`，限制在 `--allow-root` 内）；点开
-  FITS 时按需流式下载到浏览器内存文件系统再打开，输入框保留原始服务器路径。
+- 模板、FITS、结果都写在服务器的 `<root>/templates|results|data/`；
+  模板库（`/api/templates`）也优先读 `<root>/templates`。
+- **`浏览` 列的是服务器端目录**（`/api/ws/browse`，限制在 `--allow-root` 内），
+  选中 FITS 后只把**路径**发给后端，不传输文件内容。
 - **切换工作区**：点左上角 **SEWweb 图标** → 「工作区设置」面板 → 填服务器目录 → 应用
   （POST `/api/ws/root`，会做 `--allow-root` 校验并自动 `mkdir`）。同一面板也能切回
-  本地目录 / OPFS / 仅浏览器存储。
-- 接口一览：`GET /api/ws/info|browse|file|list|get`，`POST /api/ws/root|put`，`DELETE /api/ws/delete`。
+  本地目录 / OPFS / 仅浏览器存储（切回去就用浏览器算力）。
+- 接口：`GET /api/ws/info|browse|file|list|get`，`POST /api/ws/root|put`，`DELETE /api/ws/delete`。
+
+### 仅存储：`server/workspace_server.py`（纯标准库）
+
+只想托管静态站点、算力仍然留在浏览器时用这个：
+
+```bash
+python server/workspace_server.py --root ~/sew-ws --port 8790 --allow-root ~
+```
+
+它对 `/api/ws/*` 提供同样能力，但 `compute=browser`，前端会照常启动 Pyodide，
+打开服务器 FITS 时先流式下载到内存文件系统。
 
 ## 工作区（首次进入会引导设置）
 

@@ -27,6 +27,22 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TPL_LOCAL = os.path.join(DATA_DIR, "templates")
 CONFIG_PATH = os.path.join(BASE_DIR, "templates.json")
 
+# 运行时目录（服务器工作区 <root>/templates）：优先级最高，可随工作区切换。
+RUNTIME_DIRS: list = []
+
+
+def set_runtime_dir(path: Optional[str]) -> None:
+    """设置服务器工作区的模板目录（None / '' 表示不启用）。"""
+    RUNTIME_DIRS.clear()
+    if path:
+        os.makedirs(path, exist_ok=True)
+        RUNTIME_DIRS.append(os.path.abspath(os.path.expanduser(path)))
+
+
+def tpl_local() -> str:
+    """模板写入目录：服务器工作区优先，否则回到 data/templates。"""
+    return RUNTIME_DIRS[0] if RUNTIME_DIRS else TPL_LOCAL
+
 
 def _ppxf_sew_dir() -> Optional[str]:
     try:
@@ -38,7 +54,7 @@ def _ppxf_sew_dir() -> Optional[str]:
 
 
 def search_dirs():
-    dirs = [TPL_LOCAL]
+    dirs = list(RUNTIME_DIRS) + [TPL_LOCAL]
     env = os.environ.get("SEW_TEMPLATE_DIR")
     if env:
         dirs.append(os.path.expanduser(env))
@@ -154,11 +170,12 @@ def download_template(name: str, url: str, timeout=120, progress=None):
     """下载模板到 data/templates。返回最终路径。"""
     if not url or not str(url).lower().startswith(("http://", "https://")):
         raise ValueError("请提供 http(s) 模板下载地址")
-    os.makedirs(TPL_LOCAL, exist_ok=True)
+    local = tpl_local()
+    os.makedirs(local, exist_ok=True)
     fn = os.path.basename(url.split("?")[0]) or f"spectra_{name}_9.0.npz"
     if not fn.lower().endswith(".npz"):
         fn = f"spectra_{name}_9.0.npz"
-    dst = os.path.join(TPL_LOCAL, fn)
+    dst = os.path.join(local, fn)
     tmp = dst + ".part"
     req = urllib.request.Request(url, headers={"User-Agent": "SEW-web/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r, open(tmp, "wb") as f:
@@ -184,13 +201,14 @@ def download_template(name: str, url: str, timeout=120, progress=None):
 
 
 def save_uploaded_template(file_storage, name: Optional[str] = None):
-    os.makedirs(TPL_LOCAL, exist_ok=True)
+    local = tpl_local()
+    os.makedirs(local, exist_ok=True)
     fn = getattr(file_storage, "filename", "") or "template.npz"
     if not fn.lower().endswith(".npz"):
         raise ValueError("模板必须是 .npz 文件")
     if name:
         fn = f"spectra_{name}_9.0.npz"
-    dst = os.path.join(TPL_LOCAL, os.path.basename(fn))
+    dst = os.path.join(local, os.path.basename(fn))
     tmp = dst + ".part"
     file_storage.save(tmp)
     if not _npz_keys_ok(tmp):

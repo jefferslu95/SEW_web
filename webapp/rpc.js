@@ -136,10 +136,58 @@
     }
   }
 
-  // 等「工作区预初始化」（SW + 目录恢复）完成后再启动内核；即使失败也要启动
+  // 等「工作区预初始化」（SW + 目录恢复）完成后再决定用什么算力；
+  // 服务器工作区且后端声明 compute=server 时，完全不启动 Pyodide。
   const preInit = (window.__sewPreInit || Promise.resolve())
     .catch((e) => { console.warn('preInit failed', e); });
-  preInit.then(spawnWorker);
+  // 算力归属尚未定时，不要启动内核：app.js 引导期会并发请求 /api/health，
+  // 若此时强行 rpc() 会把 Pyodide 拉起来（服务器算力模式下完全不需要）。
+  let decided = null;
+  function whenDecided() {
+    if (!decided) {
+      decided = preInit.then(() => {
+        if (computeOnServer()) {
+          booted = true;
+          setBootMsg('');
+          readyResolve();
+        } else {
+          spawnWorker();
+        }
+        return true;
+      });
+    }
+    return decided;
+  }
+  whenDecided();
+
+  /* 服务器算力模式：算力与文件都在服务器，浏览器只做 UI */
+  function computeOnServer() {
+    const w = window.SEWWS;
+    if (!w) return false;
+    if (typeof w.serverCompute === 'function') return w.serverCompute();
+    return w.backend === 'server' && !!(w.server && w.server.compute === 'server');
+  }
+
+  /* 直接转发到服务器（Flask），语义与 rpc() 相同（返回已解析的 JSON） */
+  async function serverRpc(method, path, query, body) {
+    let url = path;
+    const qs = new URLSearchParams();
+    Object.keys(query || {}).forEach((k) => {
+      if (query[k] !== undefined && query[k] !== null) qs.set(k, query[k]);
+    });
+    if ([...qs.keys()].length) url += (url.includes('?') ? '&' : '?') + qs;
+    const opts = { method, cache: 'no-store', headers: {} };
+    if (method !== 'GET' && method !== 'HEAD') {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body || {});
+    }
+    const r = await fetch(url, opts);
+    let j = null;
+    try { j = await r.json(); } catch (e) { j = null; }
+    if (j === null) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
 
   let wsSynced = null;
   function ensureWs() {
@@ -149,7 +197,10 @@
     return wsSynced;
   }
 
-  function rpc(method, path, query, body) {
+  async function rpc(method, path, query, body) {
+    await whenDecided();
+    if (computeOnServer()) return serverRpc(method, path, query, body);
+    if (!worker) spawnWorker();          // 运行时从服务器算力切回本地算力
     return ready.then(ensureWs).then(() => new Promise((res, rej) => {
       const id = ++seq;
       waiting.set(id, { res, rej });
@@ -160,7 +211,9 @@
     })).then((json) => JSON.parse(json));
   }
 
-  function fsWrite(path, bytes) {
+  async function fsWrite(path, bytes) {
+    await whenDecided();
+    if (computeOnServer()) return;    // 服务器算力没有内存 FS
     return ready.then(() => new Promise((res, rej) => {
       const id = ++seq;
       waiting.set(id, { res, rej });
@@ -168,7 +221,9 @@
     }));
   }
 
-  function fsDelete(path) {
+  async function fsDelete(path) {
+    await whenDecided();
+    if (computeOnServer()) return;
     return ready.then(() => new Promise((res, rej) => {
       const id = ++seq;
       waiting.set(id, { res, rej });
@@ -184,17 +239,26 @@
 
   async function addFile(kind, name, bytes) {
     const clean = String(name || 'file').replace(/[^\w.\-+]/g, '_');
-    const base = kind === KIND_TPL ? TPL_DIR
-      : UP_DIR + Math.random().toString(16).slice(2, 10) + '_';
-    const path = base + clean;
+    const wsfs = window.SEWWS;
+    const sub = kind === KIND_TPL ? 'templates' : 'data';
+    const onServer = computeOnServer();
+    let path;
+    if (onServer) {
+      // 服务器算力：直接写到 <root>/<sub>/，不下载、不入浏览器存储
+      await wsfs.writeFile(sub, clean, new Blob([bytes]));
+      path = String(wsfs.server.root).replace(/\/+$/, '') + '/' + sub + '/' + clean;
+    } else {
+      const base = kind === KIND_TPL ? TPL_DIR
+        : UP_DIR + Math.random().toString(16).slice(2, 10) + '_';
+      path = base + clean;
+      await fsWrite(path, bytes);
+    }
     const rec = { path, name: clean, kind, size: bytes.byteLength || bytes.length,
                   mtime: Date.now() };
-    await WS.put('files', Object.assign({}, rec, { bytes }));
-    await fsWrite(path, bytes);
-    // 镜像到工作区目录（若有）
-    const wsfs = window.SEWWS;
-    if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
-      const sub = kind === KIND_TPL ? 'templates' : 'data';
+    // 服务器算力不把文件字节存进 IndexedDB（避免重复占空间）
+    await WS.put('files', onServer ? rec : Object.assign({}, rec, { bytes }));
+    // 本地目录 / 静态服务器的服务器工作区：镜像一份
+    if (!onServer && wsfs && (wsfs.dir || wsfs.backend === 'server')) {
       try { await wsfs.writeFile(sub, clean, new Blob([bytes])); }
       catch (e) { console.warn('写入工作区失败', e); }
     }
@@ -203,15 +267,47 @@
 
   async function removeFile(rec) {
     await WS.del('files', rec.path);
-    try { await fsDelete(rec.path); } catch (e) { /* ignore */ }
     const wsfs = window.SEWWS;
+    const sub = rec.kind === KIND_TPL ? 'templates' : 'data';
+    if (computeOnServer()) {
+      try { await wsfs.deleteFile(sub, rec.name); } catch (e) { /* ignore */ }
+      return;
+    }
+    try { await fsDelete(rec.path); } catch (e) { /* ignore */ }
     if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
-      const sub = rec.kind === KIND_TPL ? 'templates' : 'data';
       try { await wsfs.deleteFile(sub, rec.name); } catch (e) { /* ignore */ }
     }
   }
 
+  /* 服务器算力：只对账文件名（不下载内容） */
+  async function syncWorkspaceServer() {
+    const wsfs = window.SEWWS;
+    const items = await WS.all('files');
+    const known = new Set(items.map((x) => x.name + '::' + x.kind));
+    for (const [sub, kind] of [['templates', KIND_TPL], ['data', KIND_FITS]]) {
+      let files = [];
+      try {
+        const r = await fetch('api/ws/list?' + new URLSearchParams({ dir: sub }),
+          { cache: 'no-store', headers: wsfs._hdr() });
+        const j = await r.json();
+        files = (j && j.files) || [];
+      } catch (e) { continue; }
+      for (const f of files) {
+        const nm = typeof f === 'string' ? f : f.name;
+        const size = typeof f === 'string' ? 0 : f.size;
+        const mt = typeof f === 'string' ? Date.now() / 1000 : f.mtime;
+        if (known.has(nm + '::' + kind)) continue;
+        await WS.put('files', {
+          path: String(wsfs.server.root).replace(/\/+$/, '') + '/' + sub + '/' + nm,
+          name: nm, kind, size, mtime: (mt || 0) * 1000,
+        });
+      }
+    }
+    return items;
+  }
+
   async function syncWorkspace() {
+    if (computeOnServer()) return syncWorkspaceServer();
     const items = await WS.all('files');
     for (const it of items) {
       try { await fsWrite(it.path, it.bytes); } catch (e) { console.warn(e); }
@@ -256,15 +352,21 @@
       png: r.plot_png || '',
     };
     try {
-      await WS.put('results', rec);
       // 镜像到工作区 results/：<时间>_<模板>.json / .png
       const wsfs = window.SEWWS;
-      if (wsfs && (wsfs.dir || wsfs.backend === 'server')) {
+      const srvMode = !!(wsfs && wsfs.backend === 'server');
+      const mirror = !!(wsfs && (wsfs.dir || srvMode));
+      let stem = '';
+      if (mirror) {
         const d = new Date(rec.created);
         const p2 = (n) => String(n).padStart(2, '0');
-        const stem = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-`
+        stem = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-`
           + `${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`
           + `_${(rec.summary && rec.summary.template) || 'fit'}`;
+        if (srvMode) rec.srvName = stem;
+      }
+      await WS.put('results', rec);
+      if (mirror) {
         try {
           await wsfs.writeFile('results', stem + '.json',
             new Blob([JSON.stringify(r)], { type: 'application/json' }));
@@ -279,9 +381,26 @@
   }
 
   async function openResult(rec) {
+    // 换浏览器（服务器工作区）时本地索引里可能只有文件名，从服务器回读 JSON
+    if (!rec.json && rec.srvName) {
+      try {
+        const wsfs = window.SEWWS;
+        const blob = await wsfs.readDirFile('results', rec.srvName + '.json');
+        rec.json = JSON.parse(await blob.text());
+        rec.summary = Object.assign({}, rec.summary || {}, {
+          template: (rec.json.template || {}).name,
+          z: rec.json.z, chi2: rec.json.chi2, snr: rec.json.snr,
+        });
+        await WS.put('results', rec);
+      } catch (e) { console.warn('读取服务器结果失败', e); }
+    }
+    if (!rec.json) {
+      if (window.toast) window.toast('结果内容不可用', 'err');
+      return;
+    }
     try {
       await rpc('POST', '/api/_restore', {}, { id: rec.id, result: rec.json });
-    } catch (e) { /* 忽略：内核可能较旧 */ }
+    } catch (e) { /* 忽略：内核可能较旧 / 服务器模式无此接口 */ }
     if (typeof window.sewSetJobId === 'function') window.sewSetJobId(rec.id);
     if (typeof window.renderResult === 'function') {
       window.renderResult(rec.json, rec.target || '');
@@ -369,6 +488,8 @@
   }
 
   async function ensureMemPath(p) {
+    await whenDecided();
+    if (computeOnServer()) return p;      // 服务器算力：直接用服务器路径
     if (!p || !String(p).startsWith('/')) return p;
     if (String(p).startsWith('/sew/')) return p;
     if (memPathCache.has(p)) return memPathCache.get(p);
@@ -400,7 +521,19 @@
   }
 
   /* ================= api shim ================= */
+  async function serverPassthru(url, opts) {
+    const r = await fetch(url, Object.assign({ cache: 'no-store' }, opts || {}));
+    let j = null;
+    try { j = await r.json(); } catch (e) { j = null; }
+    if (j === null) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
+
   window.sewApi = async function (url, opts) {
+    // 服务器算力：不用 Pyodide，也不用内存 FS，全部直接打后端
+    await whenDecided();
+    if (computeOnServer()) return serverPassthru(url, opts);
     opts = opts || {};
     const u = new URL(url, location.href);
     const path = u.pathname;
@@ -540,8 +673,15 @@
             b.disabled = true;
             b.textContent = window.t ? t('tpl.msg.downloading') : '…';
             try {
-              const rec = await downloadTemplate(e.name, 'templates/' + e.file);
-              if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
+              if (computeOnServer()) {
+                // 服务器算力：让服务器自己下载到 <root>/templates
+                const abs = new URL('templates/' + e.file, location.href).href;
+                await serverRpc('POST', '/api/templates/download', {},
+                                 { name: e.name, url: abs });
+              } else {
+                const rec = await downloadTemplate(e.name, 'templates/' + e.file);
+                if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
+              }
               if (window.loadTemplates) await window.loadTemplates();
             } catch (err) {
               if (window.toast) window.toast(String(err.message || err), 'err');
@@ -602,8 +742,13 @@
         }
         dl.disabled = true;
         try {
-          const rec = await downloadTemplate(name, url);
-          if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
+          if (computeOnServer()) {
+            await serverRpc('POST', '/api/templates/download', {},
+                             { name: name || 'template', url });
+          } else {
+            const rec = await downloadTemplate(name, url);
+            if (window.toast) window.toast(t('ws.downloaded', { name: rec.name }));
+          }
           if (window.loadTemplates) await window.loadTemplates();
         } catch (e) {
           if (window.toast) window.toast(String(e.message || e), 'err');
@@ -616,6 +761,21 @@
       up.onchange = async () => {
         const f = up.files && up.files[0];
         if (!f) return;
+        if (computeOnServer()) {
+          // 服务器算力：直接 multipart 传给服务器
+          const fd = new FormData();
+          fd.append('file', f);
+          try {
+            await serverPassthru('api/templates/upload', { method: 'POST', body: fd });
+            if (window.toast) window.toast(t('ws.downloaded', { name: f.name }));
+          } catch (e) {
+            if (window.toast) window.toast(String(e.message || e), 'err');
+          }
+          up.value = '';
+          await renderWorkspace();
+          if (window.loadTemplates) await window.loadTemplates();
+          return;
+        }
         const buf = new Uint8Array(await f.arrayBuffer());
         const rec = await addFile(KIND_TPL, f.name, buf);
         up.value = '';
@@ -654,10 +814,17 @@
   };
 
   document.addEventListener('DOMContentLoaded', () => {
-    // 浏览器端没有「服务器路径」概念，改提示
     const p = $('pathInput');
-    if (p && window.t) p.placeholder = t('hdr.path.ph.wasm');
-    bindWorkspaceUI().catch((e) => {
+    bindWorkspaceUI().then(() => {
+      if (computeOnServer()) {
+        // 服务器算力：状态栏显示当前工作区
+        const ws = window.SEWWS;
+        setBootMsg('服务器算力 · 工作区 ' + (ws && ws.dirName ? ws.dirName : ''));
+      } else if (p && window.t) {
+        // 浏览器端没有「服务器路径」概念，改提示
+        p.placeholder = t('hdr.path.ph.wasm');
+      }
+    }).catch((e) => {
       console.error('workspace init failed', e);
       setBootMsg('本地工作区不可用：' + e.message, true);
     });

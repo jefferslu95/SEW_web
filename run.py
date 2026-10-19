@@ -27,15 +27,31 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--open", action="store_true", help="启动后打开浏览器")
     ap.add_argument("--debug", action="store_true")
+    ap.add_argument("--root", default=None,
+                    help="服务器工作区根目录（默认 ~/sew-workspace）")
+    ap.add_argument("--allow-root", action="append", default=[],
+                    help="允许作为/浏览的工作区目录（可多次），默认 root 与 $HOME")
+    ap.add_argument("--token", default=None,
+                    help="服务器工作区口令（也可用 SEW_WORKSPACE_TOKEN）")
     args = ap.parse_args()
 
+    # 服务器工作区配置必须在导入 app 之前入环境
+    if args.root:
+        os.environ["SEW_WS_ROOT"] = args.root
+    if args.allow_root:
+        os.environ["SEW_WS_ALLOW"] = os.pathsep.join(args.allow_root)
+    if args.token:
+        os.environ["SEW_WORKSPACE_TOKEN"] = args.token
+
     from backend.app import app
+    from backend import workspace as wsmod
 
     url = f"http://{'127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host}:{args.port}/"
     print("=" * 70)
     print("  SEW web — FITS 光谱 / 数据立方 查看与拟合")
     print(f"  URL : {url}")
     print(f"  Root: {BASE_DIR}")
+    print(f"  工作区: {wsmod.Cfg.root}  (算力: 服务器)")
     print(f"  Python: {sys.executable}")
     print("=" * 70)
     if args.open:
