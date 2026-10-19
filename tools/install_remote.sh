@@ -115,14 +115,31 @@ else
 fi
 
 # ---------- 2. 代码 ----------
+ssh_repo_url() {
+  printf '%s' "$1" | sed -E 's#^https://github\.com/#git@github.com:#'
+}
+
+clone_repo() {
+  say "克隆代码：$1 → $DIR"
+  git clone --depth 1 "$1" "$DIR" -q
+}
+
 if [[ -d "$DIR/.git" ]]; then
   say "更新代码：$DIR"
   git -C "$DIR" pull --ff-only -q || warn "git pull 失败，继续用现有代码"
 elif [[ -f "$DIR/run.py" ]]; then
-  say "使用现有目录：$DIR"
+  say "使用现有目录：$DIR（非 git 仓库，跳过更新）"
 else
-  say "克隆代码到：$DIR"
-  git clone --depth 1 "$REPO" "$DIR" -q
+  if ! clone_repo "$REPO"; then
+    # 有些网络 443 被拦、22 可用（或反之）：换个协议再试一次
+    ALT="$(ssh_repo_url "$REPO")"
+    warn "HTTPS 克隆失败，改用 SSH：$ALT"
+    rm -rf "$DIR"
+    clone_repo "$ALT" || {
+      warn "克隆失败。可用 --repo 指定可达的仓库地址，或手动把代码放到 $DIR 再运行"
+      exit 1
+    }
+  fi
 fi
 cd "$DIR"
 
