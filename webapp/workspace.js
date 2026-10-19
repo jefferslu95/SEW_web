@@ -21,12 +21,9 @@
   const SUBDIRS = ['templates', 'results', 'data', 'cache'];
 
   const FS_SUPPORTED = typeof window.showDirectoryPicker === 'function';
-  // VS Code 内置浏览器（尤其 Remote-SSH）会把 File System Access 的目录对话框
-  // 交给远端扩展宿主，列出来的是服务器上的目录，而不是用户本机的目录。
-  // 这种情况下提示用户改用本机 Chrome / Edge 打开本页。
-  const HOSTED_BY_VSCODE = /Electron/i.test(navigator.userAgent)
-    || location.protocol === 'vscode-webview:'
-    || /^vscode-webview/i.test(String(location.origin));
+  // 本页若由静态站点提供（无后端），算力与工作区都在浏览器内，File System
+  // Access 只能选到“运行浏览器的那台机器”的目录；想用 SSH 服务器上的目录与
+  // 算力，必须打开服务器上 run.py 提供的页面（那里有 api/ws/browse）。
 
   const SEWWS = {
     supported: FS_SUPPORTED,
@@ -422,8 +419,8 @@
     return new Promise((resolve) => {
       const w = buildWizard();
       const info = () => $('wizInfo');
-      if (HOSTED_BY_VSCODE && $('wizHost')) {
-        $('wizHost').textContent = T('wiz.vscodeDir');
+      if (!SEWWS.serverCompute() && $('wizHost')) {
+        $('wizHost').textContent = T('wiz.staticOnly');
       }
       $('wizPick').onclick = async () => {
         try {
@@ -713,7 +710,7 @@
     const sh = $('setStaticHint');
     if (sh) {
       sh.textContent = T('set.staticHint', { origin: location.origin })
-        + (HOSTED_BY_VSCODE ? ' ' + T('wiz.vscodeDir') : '');
+        + ' ' + T('wiz.staticOnly');
     }
 
     const close = () => el.remove();

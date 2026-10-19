@@ -353,7 +353,7 @@
   "wiz.chosen": "已选择：{name}",
   "wiz.browserOnly": "将只用浏览器存储（IndexedDB），清缓存后会丢失。",
   "wiz.unsupported": "当前浏览器不支持目录访问，将只用浏览器存储。",
-  "wiz.vscodeDir": "注意：VS Code 内置浏览器会把目录对话框交给远端处理，列出来的是 SSH 服务器上的目录。要用本机目录，请在你自己电脑的 Chrome / Edge 里打开本页。",
+  "wiz.staticOnly": "本页由静态站点提供（无后端），算力和工作区都在当前浏览器，因此只能选本机目录。要使用 SSH 服务器上的目录与算力，请打开该服务器上 run.py 提供的页面（例如 http://127.0.0.1:8800）。",
   "wiz.pickAbort": "已取消目录选择。",
   "wiz.server": "服务器工作区",
   "wiz.serverChosen": "已选择服务器工作区：{root}",

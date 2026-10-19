@@ -353,7 +353,7 @@
   "wiz.chosen": "Selected: {name}",
   "wiz.browserOnly": "Using browser storage only; clearing site data removes everything.",
   "wiz.unsupported": "This browser cannot access folders; using browser storage only.",
-  "wiz.vscodeDir": "Note: VS Code's built-in browser hands the folder dialog to the remote host, so it lists folders on the SSH server. To choose a folder on your own computer, open this page in Chrome / Edge on your local machine.",
+  "wiz.staticOnly": "This page is served as a static site (no backend): compute and workspace run inside this browser, so only folders on this machine can be chosen. To use folders and compute on the SSH server, open the page served by run.py on that server (e.g. http://127.0.0.1:8800).",
   "wiz.pickAbort": "Folder selection cancelled.",
   "wiz.server": "Server workspace",
   "wiz.serverChosen": "Server workspace: {root}",
