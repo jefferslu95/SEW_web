@@ -50,6 +50,28 @@ python -m http.server 8790 --directory webapp
 
 > 必须通过 HTTP 打开（`file://` 下 Worker/Pyodide 不可用）。
 
+## 服务器工作区模式（SSH 转发 / 团队共用同一台机器）
+
+用 SSH 端口转发访问时，工作区应该落在**服务器**而不是访问者本地：
+
+```bash
+# 服务器上（纯标准库，无需 Flask）
+python server/workspace_server.py --root ~/sew-ws --port 8791 \
+    --allow-root ~ --allow-root /data
+# 本地（可选）ssh -N -L 8791:127.0.0.1:8791 user@server
+```
+
+- 启动参数：`--root` 初始工作区；`--allow-root`（可多次）限定可切换/可浏览的目录范围，
+  不传时默认 `[--root, $HOME]`；`--token` 可给 `/api/ws/*` 加 `X-SEW-Token` 校验。
+- 页面会自动探测 `/api/ws/info`；成功即进入「服务器工作区」模式：模板、FITS、结果都写在
+  服务器目录的 `templates/ results/ data/` 下（写入走 `<name>.part` → `os.replace`，不产生半截文件）。
+- **`浏览` 列的是服务器端目录**（`/api/ws/browse`，限制在 `--allow-root` 内）；点开
+  FITS 时按需流式下载到浏览器内存文件系统再打开，输入框保留原始服务器路径。
+- **切换工作区**：点左上角 **SEWweb 图标** → 「工作区设置」面板 → 填服务器目录 → 应用
+  （POST `/api/ws/root`，会做 `--allow-root` 校验并自动 `mkdir`）。同一面板也能切回
+  本地目录 / OPFS / 仅浏览器存储。
+- 接口一览：`GET /api/ws/info|browse|file|list|get`，`POST /api/ws/root|put`，`DELETE /api/ws/delete`。
+
 ## 工作区（首次进入会引导设置）
 
 首次打开会弹出「设置工作区」：选一个本地文件夹（File System Access API）作为工作区，
@@ -73,6 +95,8 @@ python -m http.server 8790 --directory webapp
 - 不支持目录访问的浏览器（Firefox/Safari）退化为「仅浏览器存储」（IndexedDB），功能不变，
   但清站点数据会丢。
 - 工作区面板里有「把运行依赖保存到工作区」按钮，可随时重新镜像。
+- 本地目录模式下页面上没有「服务器路径」概念；只有在 SSH 转发 + `server/workspace_server.py`
+  的「服务器工作区」模式下，`浏览` 才会列出服务器目录。
 
 ## 旧版说明（IndexedDB 工作区）
 

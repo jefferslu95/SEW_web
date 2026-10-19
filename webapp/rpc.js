@@ -345,6 +345,46 @@
     return { ok: true, path: '工作区', parent: '工作区', dirs: [], files };
   }
 
+  /* ================= 服务器目录浏览 ================= */
+  async function browseServer(path) {
+    const q = new URLSearchParams();
+    if (path) q.set('path', path);
+    const ws = window.SEWWS;
+    const r = await fetch('api/ws/browse?' + q.toString(),
+      { cache: 'no-store', headers: (ws && ws._hdr()) || {} });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
+
+  /* 服务器上的绝对路径 → 先下载到 Pyodide 内存 FS，再交给 Python */
+  const memPathCache = new Map();
+  function strHash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  }
+
+  async function ensureMemPath(p) {
+    if (!p || !String(p).startsWith('/')) return p;
+    if (String(p).startsWith('/sew/')) return p;
+    if (memPathCache.has(p)) return memPathCache.get(p);
+    const ws = window.SEWWS;
+    const r = await fetch('api/ws/file?' + new URLSearchParams({ path: p }),
+      { headers: (ws && ws._hdr()) || {} });
+    if (!r.ok) throw new Error(`无法读取服务器文件（HTTP ${r.status}）`);
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const base = String(p).split('/').pop() || 'file.fits';
+    const clean = base.replace(/[^\w.\-+]/g, '_');
+    const dst = '/sew/data/server/' + strHash(String(p)) + '/' + clean;
+    await fsWrite(dst, buf);
+    memPathCache.set(p, dst);
+    return dst;
+  }
+
   /* ================= 模板下载 ================= */
   const MANIFEST = 'templates/manifest.json';
 
@@ -374,8 +414,12 @@
       return handleUpload(Object.assign({}, opts, { __tpl: true }));
     }
 
-    // 工作区（浏览器本地文件系统替身）
-    if (path === '/api/browse') return browseWorkspace();
+    // 工作区（浏览器本地文件系统替身）；服务器模式下直接浏览服务器目录
+    if (path === '/api/browse') {
+      const ws = window.SEWWS;
+      if (ws && ws.backend === 'server') return browseServer(query.path || '');
+      return browseWorkspace();
+    }
 
     // 模板下载：交给 JS fetch，落到工作区
     if (path === '/api/templates/download') {
@@ -390,10 +434,17 @@
     if (typeof opts.body === 'string' && opts.body) {
       try { body = JSON.parse(opts.body); } catch (e) { body = {}; }
     }
+    // /api/open、/api/inspect 可能传入服务器上的绝对路径：先下载到内存 FS
+    let originalPath = null;
+    if ((path === '/api/open' || path === '/api/inspect') && body.path) {
+      originalPath = body.path;
+      body.path = await ensureMemPath(body.path);
+    }
     const j = await rpc(method, path, query, body);
     if (!j || j.ok === false) {
       throw new Error((j && j.error) || `HTTP ${j && j.code || 500}`);
     }
+    if (originalPath && j && typeof j === 'object') j.path = originalPath;
     return j;
   };
 

@@ -26,6 +26,9 @@ header{
   padding:9px 14px;background:#101827;color:#e8eefc;
   border-bottom:1px solid #0b1220;box-shadow:0 1px 6px rgba(0,0,0,.25);
 }
+.brand{cursor:pointer;border-radius:6px;padding:1px 3px;transition:background .12s}
+.brand:hover{background:rgba(110,168,255,.14)}
+.brand:focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
 .brand{display:flex;flex-direction:column;line-height:1.05}
 .logo{font-size:19px;font-weight:700;letter-spacing:.4px}
 .logo span{color:#6ea8ff}
@@ -373,3 +376,7 @@ summary:hover{color:var(--accent)}
 .wiz-list li{margin:2px 0}
 .wiz-pick{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
 .wiz-foot{margin-top:12px;display:flex;justify-content:flex-end}
+/* 工作区设置面板 */
+.set-sec{margin:10px 0;padding-top:8px;border-top:1px dashed var(--line)}
+.set-h{font-size:12.5px;color:#33405a;font-weight:600;margin-bottom:4px}
+#setCur{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}

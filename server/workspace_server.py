@@ -44,7 +44,20 @@ MAX_BODY = 4 * 1024 * 1024 * 1024        # 4 GB
 
 class Config:
     root = os.path.expanduser("~/sew-workspace")
+    allow_roots = []        # 允许浏览/作为工作区的目录（默认 root + $HOME）
     token = os.environ.get("SEW_WORKSPACE_TOKEN", "")
+
+
+FITS_EXT = (".fits", ".fit", ".fts", ".fits.gz")
+
+
+def _in_allow_roots(path: str) -> bool:
+    rp = os.path.realpath(path)
+    for r in Config.allow_roots:
+        r = os.path.realpath(r)
+        if rp == r or rp.startswith(r + os.sep):
+            return True
+    return False
 
 
 def _safe_name(name: str) -> str:
@@ -143,6 +156,54 @@ class Handler(SimpleHTTPRequestHandler):
                                        writable=os.access(Config.root, os.W_OK),
                                        used_bytes=usage,
                                        auth=bool(Config.token)))
+            if path == "/api/ws/browse":
+                raw = (q.get("path", [""])[0] or "").strip()
+                target = os.path.abspath(os.path.expanduser(raw)) if raw \
+                    else Config.root
+                if not _in_allow_roots(target):
+                    return self._json(dict(ok=False, error=f"路径不在允许范围内: {target}"), 403)
+                if not os.path.isdir(target):
+                    return self._json(dict(ok=False, error=f"目录不存在: {target}"), 404)
+                dirs, files = [], []
+                try:
+                    with os.scandir(target) as it:
+                        for e in it:
+                            try:
+                                if e.is_dir():
+                                    dirs.append(dict(name=e.name, path=e.path))
+                                elif e.is_file() and e.name.lower().endswith(FITS_EXT):
+                                    st = e.stat()
+                                    files.append(dict(name=e.name, path=e.path,
+                                                      size=int(st.st_size),
+                                                      mtime=float(st.st_mtime)))
+                            except OSError:
+                                continue
+                except PermissionError:
+                    return self._json(dict(ok=False, error=f"无权限读取: {target}"), 403)
+                dirs.sort(key=lambda x: x["name"].lower())
+                files.sort(key=lambda x: x["name"].lower())
+                parent = os.path.dirname(target)
+                if parent == target or not _in_allow_roots(parent):
+                    parent = target
+                return self._json(dict(ok=True, path=target, parent=parent,
+                                       dirs=dirs, files=files,
+                                       roots=[os.path.realpath(r) for r in Config.allow_roots]))
+            if path == "/api/ws/file":
+                raw = (q.get("path", [""])[0] or "").strip()
+                target = os.path.abspath(os.path.expanduser(raw))
+                if not _in_allow_roots(target):
+                    return self._json(dict(ok=False, error="路径不在允许范围内"), 403)
+                if not os.path.isfile(target):
+                    return self._json(dict(ok=False, error="文件不存在"), 404)
+                size = os.path.getsize(target)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(size))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                with open(target, "rb") as f:
+                    shutil.copyfileobj(f, self.wfile, 1 << 20)
+                return
             if path == "/api/ws/list":
                 d = (q.get("dir", [""])[0])
                 folder = _safe_dir(d)
@@ -180,6 +241,24 @@ class Handler(SimpleHTTPRequestHandler):
 
     def api_post(self, path, q):
         try:
+            if path == "/api/ws/root":
+                length = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(length) if length > 0 else b"{}"
+                try:
+                    body = json.loads(raw.decode("utf-8") or "{}")
+                except Exception:
+                    body = {}
+                new_root = str(body.get("root") or q.get("root", [""])[0]).strip()
+                if not new_root:
+                    return self._json(dict(ok=False, error="缺少 root"), 400)
+                new_root = os.path.abspath(os.path.expanduser(new_root))
+                if not _in_allow_roots(new_root):
+                    return self._json(dict(ok=False, error=f"不允许的目录: {new_root}"), 403)
+                os.makedirs(new_root, exist_ok=True)
+                Config.root = new_root
+                _ensure_dirs()
+                return self._json(dict(ok=True, root=Config.root,
+                                       dirs=list(SUBDIRS)))
             if path == "/api/ws/put":
                 d = _safe_dir(q.get("dir", [""])[0])
                 name = _safe_name(q.get("name", [""])[0])
@@ -242,6 +321,8 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> int:
     ap = argparse.ArgumentParser(description="SEW web 静态站点 + 服务器工作区")
     ap.add_argument("--root", default=Config.root, help="工作区根目录")
+    ap.add_argument("--allow-root", action="append", default=[],
+                    help="允许浏览/作为工作区的目录（可多次），默认 root 与 $HOME")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8790)
     ap.add_argument("--token", default=Config.token,
@@ -250,6 +331,11 @@ def main() -> int:
 
     Config.root = os.path.abspath(os.path.expanduser(args.root))
     Config.token = args.token or ""
+    Config.allow_roots = [os.path.abspath(os.path.expanduser(p))
+                          for p in args.allow_root] or [Config.root,
+                                                        os.path.expanduser("~")]
+    if Config.root not in Config.allow_roots:
+        Config.allow_roots.insert(0, Config.root)
     os.makedirs(Config.root, exist_ok=True)
     _ensure_dirs()
 

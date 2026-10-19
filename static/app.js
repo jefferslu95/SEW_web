@@ -111,7 +111,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const s = await api('/api/samples');
     if (s.samples && s.samples.length) {
       $('pathInput').placeholder = t('hdr.sample', { path: s.samples[0] });
-      $('pathInput').value = s.samples[0];
+      // 启动期异步返回：若用户已打开/正在浏览文件，不要覆盖输入框
+      if (!S.path && !$('pathInput').value) $('pathInput').value = s.samples[0];
     }
   } catch (e) { /* ignore */ }
   window.addEventListener('resize', () => {
@@ -151,12 +152,19 @@ function syncPanelHeight() {
   document.documentElement.style.setProperty('--panel-h', h + 'px');
 }
 
+function browseStart() {
+  if (S.path) return S.path.replace(/[^/]*$/, '');
+  const W = window.SEWWS;
+  if (W && W.backend === 'server' && W.dirName) return W.dirName;
+  return '~';
+}
+
 function bindEvents() {
   $('openBtn').onclick = () => openPath($('pathInput').value.trim());
   $('pathInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') openPath($('pathInput').value.trim());
   });
-  $('browseBtn').onclick = () => openBrowse(S.path ? S.path.replace(/[^/]*$/, '') : '~');
+  $('browseBtn').onclick = () => openBrowse(browseStart());
   $('fileInput').onchange = onUploadFile;
 
   $('applyOverride').onclick = applyOverride;
@@ -225,7 +233,7 @@ function bindEvents() {
   };
   $('fwhmLsfBrowse').onclick = () => {
     const cur = $('fwhmLsfPath').value || '';
-    openBrowse(cur.replace(/[^/]*$/, '') || '~',
+    openBrowse(cur ? cur.replace(/[^/]*$/, '') : browseStart(),
                (p) => { $('fwhmLsfPath').value = p; });
   };
   $('showMask').onchange = () => { if (S.spec) drawSpectrum(S.spec); };

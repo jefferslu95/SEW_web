@@ -358,5 +358,14 @@
   "wiz.tokenAsk": "Server workspace token",
   "wiz.tokenBad": "Invalid token",
   "ws.srvAt": "Workspace (server): {root}",
-  "ws.hint.srv": "Templates and fit results are stored on the server workspace: {root}"
+  "ws.hint.srv": "Templates and fit results are stored on the server workspace: {root}",
+  "set.open": "Workspace settings",
+  "set.title": "Workspace settings",
+  "set.current": "Current:",
+  "set.server": "Server workspace",
+  "set.serverHint": "Directory on the server (must be under --allow-root). Templates, FITS and results are stored there.",
+  "set.apply": "Apply",
+  "set.local": "Local / browser workspace",
+  "set.changed": "Workspace switched",
+  "set.badRoot": "Cannot switch workspace: {msg}"
 }

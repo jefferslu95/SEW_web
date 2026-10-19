@@ -65,6 +65,27 @@
       return this.server;
     },
 
+    async setPref(v) {
+      try { await this._metaPut('backend', v); } catch (e) { /* ignore */ }
+    },
+
+    /* 切换服务器工作区目录（服务端重启后仍有效） */
+    async setServerRoot(path) {
+      const r = await fetch('api/ws/root', {
+        method: 'POST',
+        headers: this._hdr({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ root: path }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.ok === false) {
+        throw new Error(j.error || `HTTP ${r.status}`);
+      }
+      const info = await this.detectServer();
+      this.useServer(info || { root: j.root, writable: true });
+      await this.setPref('server');
+      return this.server;
+    },
+
     async _srvPut(dir, name, blob) {
       const q = new URLSearchParams({ dir, name });
       const r = await fetch('api/ws/put?' + q, {
@@ -325,9 +346,11 @@
         ]);
       } catch (e) { console.warn('SW 注册失败', e); }
     }
-    // 1) 服务器工作区（远程部署/SSH 转发时优先）
+    // 1) 服务器工作区（远程部署/SSH 转发时优先；用户显式选过本地则不覆盖）
+    let pref = null;
+    try { pref = await SEWWS._metaGet('backend'); } catch (e) { /* ignore */ }
     const srv = await SEWWS.detectServer();
-    if (srv && srv.writable) {
+    if (srv && srv.writable && pref !== 'local' && pref !== 'browser') {
       SEWWS.useServer(srv);
       return { restored: true, server: true };
     }
@@ -341,7 +364,6 @@
     }
     return { restored, server: false };
   }
-
   /* ================= 首次引导 ================= */
   function buildWizard() {
     if ($('wsWizard')) return $('wsWizard');
@@ -382,13 +404,17 @@
       $('wizPick').onclick = async () => {
         try {
           const h = await SEWWS.pickDir();
+          SEWWS.backend = 'local';
+          await SEWWS.setPref('local');
           info().textContent = T('wiz.chosen', { name: h.name });
         } catch (e) {
           info().textContent = String(e.message || e);
         }
       };
-      $('wizSkip').onclick = () => {
+      $('wizSkip').onclick = async () => {
         SEWWS.dir = null;
+        SEWWS.backend = 'browser';
+        await SEWWS.setPref('browser');
         info().textContent = T('wiz.browserOnly');
       };
       if ($('wizOpfs')) {
@@ -396,6 +422,7 @@
           try {
             const h = await SEWWS.useOPFS();
             SEWWS.backend = 'browser';
+            await SEWWS.setPref('browser');
             info().textContent = T('wiz.chosen', { name: h.name || 'OPFS' });
           } catch (e) {
             info().textContent = String(e.message || e);
@@ -489,6 +516,113 @@
     }
   }
 
+  /* ================= 工作区设置面板（点左上角 SEWweb） ================= */
+  function currentLabel() {
+    if (SEWWS.backend === 'server') return T('ws.srvAt', { root: SEWWS.dirName });
+    if (SEWWS.backend === 'local') return T('ws.dirAt', { name: SEWWS.dirName });
+    return T('ws.dirNone');
+  }
+
+  async function refreshAfterSwitch(msg) {
+    try { if (window.sewRescanWorkspace) await window.sewRescanWorkspace(); }
+    catch (e) { console.warn(e); }
+    try { if (typeof afterBoot === 'function') await afterBoot(); }
+    catch (e) { console.warn(e); }
+    if (window.toast) window.toast(msg || T('set.changed'));
+  }
+
+  function openSettings() {
+    const old = $('wsSettings');
+    if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'wsSettings';
+    el.className = 'wizard';
+    el.innerHTML = `
+      <div class="wizard-box">
+        <h2 data-i18n="set.title"></h2>
+        <p class="small"><span data-i18n="set.current"></span>
+          <b id="setCur"></b></p>
+        <div class="set-sec">
+          <div class="set-h" data-i18n="set.server"></div>
+          <div class="small muted" data-i18n="set.serverHint"></div>
+          <div class="row" style="margin-top:6px">
+            <input id="setSrvPath" type="text" style="flex:1;min-width:0"/>
+            <button id="setSrvApply" class="primary" data-i18n="set.apply"></button>
+          </div>
+        </div>
+        <div class="set-sec">
+          <div class="set-h" data-i18n="set.local"></div>
+          <div class="row">
+            <button id="setLocal" class="ghost" data-i18n="wiz.pick"></button>
+            <button id="setOpfs" class="ghost" data-i18n="wiz.opfs"></button>
+            <button id="setBrowser" class="ghost" data-i18n="wiz.skip"></button>
+          </div>
+        </div>
+        <div class="wiz-foot">
+          <button id="setClose" class="ghost" data-i18n="modal.close"></button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    if (window.applyI18N) window.applyI18N(el);
+
+    const cur = $('setCur');
+    const paint = () => { cur.textContent = currentLabel(); };
+    paint();
+    $('setSrvPath').value = (SEWWS.backend === 'server' && SEWWS.dirName)
+      || (SEWWS.server && SEWWS.server.root) || '';
+
+    const close = () => el.remove();
+    $('setClose').onclick = close;
+    el.addEventListener('click', (e) => { if (e.target === el) close(); });
+
+    $('setSrvApply').onclick = async () => {
+      const path = ($('setSrvPath').value || '').trim();
+      if (!path) return;
+      const btn = $('setSrvApply');
+      btn.disabled = true;
+      try {
+        await SEWWS.setServerRoot(path);
+        paint();
+        await refreshAfterSwitch();
+      } catch (e) {
+        if (window.toast) window.toast(T('set.badRoot', { msg: e.message || e }), 'err');
+      } finally { btn.disabled = false; }
+    };
+
+    $('setLocal').onclick = async () => {
+      try {
+        const h = await SEWWS.pickDir();
+        SEWWS.backend = 'local';
+        SEWWS.dirName = h.name;
+        await SEWWS.setPref('local');
+        paint();
+        await refreshAfterSwitch();
+      } catch (e) { /* 用户取消 */ }
+    };
+
+    $('setOpfs').onclick = async () => {
+      try {
+        await SEWWS.useOPFS();
+        SEWWS.backend = 'browser';
+        await SEWWS.setPref('browser');
+        paint();
+        await refreshAfterSwitch();
+      } catch (e) {
+        if (window.toast) window.toast(String(e.message || e), 'err');
+      }
+    };
+
+    $('setBrowser').onclick = async () => {
+      SEWWS.dir = null;
+      SEWWS.backend = 'browser';
+      SEWWS.dirName = '';
+      await SEWWS.setPref('browser');
+      paint();
+      await refreshAfterSwitch();
+    };
+  }
+  window.sewOpenSettings = openSettings;
+
   const preInitP = preInit();
   window.__sewPreInit = preInitP;   // 只包含 SW 注册 + 工作区探测（不等内核）
 
@@ -525,6 +659,13 @@
 
   window.SEWWS = SEWWS;
   document.addEventListener('DOMContentLoaded', () => {
+    const brand = document.getElementById('brandBtn');
+    if (brand) {
+      brand.addEventListener('click', () => openSettings());
+      brand.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSettings(); }
+      });
+    }
     SEWWS.ready.then(afterBoot).catch((e) => console.warn(e));
   });
 })();
